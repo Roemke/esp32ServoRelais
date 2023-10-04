@@ -1,12 +1,9 @@
-#define mySSID2 "TardisPi"
-#define myPASSWORD2 "geheim"
 #define mySSID "FamilyWlan"
 #define myPASSWORD "geheim"
-#define apSSID "ESP32Wlan"
-#define apPASSWORD "sagIchAuchNicht"
-#define AUTHOR_EMAIL "<email>"
-#define AUTHOR_PASSWORD "<password>"
-/* Recipient email address */
-#define RECIPIENT_EMAIL "<recipient email here>"
-const byte myKey[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-//oben einen eigenen waehlen
+
+//eigener ap
+#define apSSID "ESP32ServoWlan"
+#define apPASSWORD "wiederGeheim"
+
+//der broker 
+#define mqttBROKER "192.168.x.x"
