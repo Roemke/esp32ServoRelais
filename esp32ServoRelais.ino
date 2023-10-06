@@ -65,14 +65,13 @@ const char *password = myPASSWORD;
 ObjectList <String> startmeldungen(16); //dient zum Puffern der Meldungen am Anfang
 
 Servo servo;
-static const int servoPin = 15;
+static const int servoPin = 15;//ist io15 = tdo
 
-
-const char * keySchlossStatusOpen ="kSOpen"; //max 13 chars  
-const char * keyMailEnabled   ="kMEnable";
-bool schlossStatusOpen = false;
-bool mailEnabled = false;
-
+//und die Relais
+const int r1pin = 26; 
+const int r2pin = 18;
+const int r3pin = 19;
+const int r4pin = 23;
 
 
 AsyncWebServer server(80);
@@ -328,8 +327,6 @@ void wsMsgSerial(const char *message, AsyncWebSocketClient * client = 0)
 void sendAvailableData(AsyncWebSocketClient * client, AsyncWebSocket *server)
 {
    //sende die Daten an den Client
-   client->text(  "{\"action\":\"setStatus\",\"schlossOpen\":\""+ String(schlossStatusOpen) + "\"}");
-   client->text( "{\"action\":\"mailEnabled\",\"mailEnabled\":\""+ String(mailEnabled) + "\"}" );  
    wsMessage(startmeldungen.htmlLines().c_str(),client);
    String msg = String("WebSocket client ") + String(client->id()) + String(" connected from ") +  client->remoteIP().toString();
    wsMsgSerial(msg.c_str());
@@ -410,6 +407,36 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
               blue.switchOut("dc_output_on", (const char *) doc["value"]);  
               //info an angeschlossene devices / smartphone muesste ueber bluetti(bluetooth)->dieser esp(websocket)-> angeschlosse devices laufen
           }
+          else if ( strcmp(doc["action"],"servo")==0)
+          {
+              //steuere mal den Servo an   
+                //lese Wert von Serial
+                //wsMsgSerial("Warte auf eingabe");
+                //while (Serial.available()==0){}             // wait for user input
+                //int val = Serial.parseInt();                    //Read user input and hold it in a variable
+                //char buffer[64] = "";
+                //sprintf(buffer,"Habe Wert %d gelesen", val);
+              
+                //mein servo 98:  langsam links  97 er ruckelt
+                //87 ruckelnd links oder nichts 
+                //86 langsam rechts bei 30-40 ist er schon bei max speed rechts ich denke die Bibliothek ist halt fuer normale Servos gedacht:-)
+                /* die spezielle biblio bringt aber auch nichts, da sie einen parallax feedback sensor erwartet, der konstet sehr viel + viel versand */
+                //geeignet: 85 langsam rechts
+                //          92 stop 
+                //          99 langsam links 
+                // 80 und 102  passen gefühlt gut zueinander
+                // 70 und 110 schneller
+                // 40 und 140 max speed 
+                
+                //wsMsgSerial(buffer);
+                int val = 92;
+                if (!strcmp(doc["value"],"left")) 
+                   val = 110;  
+                else if (!strcmp(doc["value"],"right"))
+                   val = 70; 
+                
+                servo.write(val);    
+          }
           else if (strcmp(doc["action"],"keepWebServerAlive")==0) 
           {
             startTime = millis();
@@ -425,9 +452,9 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
             wsMsgSerial("Restart of ESP");
             ESP.restart();
           }
-          else if (strcmp(doc["action"],"schalte")==0)
+          else if (!strcmp(doc["action"],"relais"))
           {
-            schalteRelais();
+            schalteRelais( doc["value"]);
           }
         }
         //Serial.println("Rfids2");
@@ -448,15 +475,41 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
 
 
 //--------------------------------------------------------------
-void schalteRelais()
+void schalteRelais(const char * value) //muss const char * sein sonst meckert die JSON-Bibliothek
 {
+  char msg[64]="Bin in Relais schalten: ";
+  strcat(msg,value);
+  wsMsgSerial(msg);
   
+  char relais[3]="";
+  char switchTo[4]=""; 
+  int mode = LOW;
+  int pin = 0; 
+  strncat(relais,value+1,2); //aufbau bR1on oder bR1off
+  strcpy(switchTo,value+3);
 
-  ws.textAll( "{\"action\":\"setStatus\",\"ChargeBlue\":\"true\"}" );
-  wsMsgSerial("Geschaltet per webinterface oder Karte damit auch Statusänderung");
-  //digitalWrite(RELAIS_PIN,HIGH); //200ms auf high müsste zum schalten reichen?
-  //delay(200);
-  //digitalWrite(RELAIS_PIN,LOW);
+  if (!strcmp(relais,"R1")) //naja wenig elegant
+    pin = r1pin; 
+  else if (!strcmp(relais,"R2"))
+    pin = r2pin;
+  else if (!strcmp(relais,"R3"))
+    pin = r3pin;
+  else if (!strcmp(relais,"R4"))
+    pin = r4pin;
+     
+  if (!strcmp(switchTo,"on"))
+    mode = HIGH;
+  
+  sprintf(msg,"Write to relais %s switchTo is %s, pin %d mode is %d",relais,switchTo,pin,mode);
+  wsMsgSerial(msg);
+
+  if (pin)
+  {
+    digitalWrite(pin,mode);
+    sprintf(msg,"Write to pin %d mode is %d",pin,mode);
+    wsMsgSerial(msg);
+    
+  }
 }
 
               
@@ -468,6 +521,11 @@ void setup() {
   //Servo Geschichte 
   servo.attach(servoPin);
 
+  //pins setzen 
+  pinMode(r1pin ,OUTPUT); 
+  pinMode(r2pin ,OUTPUT);
+  pinMode(r3pin ,OUTPUT);
+  pinMode(r4pin ,OUTPUT);
 
   WiFi.begin(ssid, password);
 
@@ -547,26 +605,4 @@ void loop() {
     //Serial.println("try to publish esp32solar/state online");
   }  
   //---------------------------------------------------------------------------
-  //steuere mal den Servo an   
-  //lese Wert von Serial
-  //wsMsgSerial("Warte auf eingabe");
-  //while (Serial.available()==0){}             // wait for user input
-  //int val = Serial.parseInt();                    //Read user input and hold it in a variable
-  //char buffer[64] = "";
-  //sprintf(buffer,"Habe Wert %d gelesen", val);
-
-  //mein servo 98:  langsam links  97 er ruckelt
-  //87 ruckelnd links oder nichts 
-  //86 langsam rechts bei 30-40 ist er schon bei max speed rechts ich denke die Bibliothek ist halt fuer normale Servos gedacht:-)
-  /* die spezielle biblio bringt aber auch nichts, da sie einen parallax feedback sensor erwartet, der konstet sehr viel + viel versand */
-  //geeignet: 85 langsam rechts
-  //          92 stop 
-  //          99 langsam links 
-  // 80 und 102  passen gefühlt gut zueinander
-  // 70 und 110 schneller
-  // 40 und 140 max speed 
-  
-  //wsMsgSerial(buffer);
-  //if (val != 0) 
-    //servo.write(val);    
 }

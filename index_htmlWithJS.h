@@ -168,6 +168,18 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         { 
           document.getElementById('iMessage').innerHTML = "";
         });        
+        document.getElementById('bServoLeft').addEventListener("click",() => 
+        {
+           websocket.send(JSON.stringify({'action':'servo','value':'left'}));
+        });
+        document.getElementById('bServoRight').addEventListener("click",() => 
+        {
+           websocket.send(JSON.stringify({'action':'servo','value':'right'}));
+        });
+        document.getElementById('bServoStop').addEventListener("click",() => 
+        {
+           websocket.send(JSON.stringify({'action':'servo','value':'stop'}));
+        });
         document.getElementById('bToggleDC').addEventListener("click",() => 
         { 
           if (!bluettiOn)
@@ -175,9 +187,20 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
           else             
             websocket.send(JSON.stringify({'action':'dc_output_on','value':'off'}));
         });        
+        //die relais testen -> buttons im form
+        let fButtons = fRelais.querySelectorAll("#fRelais > button"); //sollten 8 sein 
+        fButtons.forEach( element => 
+        {
+           element.addEventListener("click", evt =>
+           {
+             console.log("click on event listener of Relais-Button " + evt.target.id);
+             websocket.send(JSON.stringify({'action':'relais','value':evt.target.id}));
+           });
+        });
+         
       }); 
     </script>
-  </head> 
+  </head>  
   <body style='font-family:Helvetica, sans-serif'> 
     <div id='controlContainer'>
         <h1>Solar / Power Control </h1>
@@ -209,7 +232,22 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
     <div class="framed">
     <h2> manuelle Schalter </h2>
     <form>
-      <button id="bToggleDC" type="button">toggle Bluetti DC</button> <!-- immer noch (2023-09) ein Button sendet ab außer er ist type button -->
+      <button id="bToggleDC"   type="button">toggle Bluetti DC</button> <!-- immer noch (2023-09) ein Button sendet ab außer er ist type button -->
+      <!------- Servo testen -->
+      <button id="bServoLeft"  type="button">Servo Left</button> <!-- immer noch (2023-09) ein Button sendet ab außer er ist type button -->
+      <button id="bServoRight" type="button">Servo Right</button> <!-- immer noch (2023-09) ein Button sendet ab außer er ist type button -->
+      <button id="bServoStop"  type="button">Servo Stop</button> <!-- immer noch (2023-09) ein Button sendet ab außer er ist type button -->
+    </form>
+    <form id="fRelais">
+      <!-------- Relais testen --->
+      <button id="bR1on"   type="button">R1 on</button>
+      <button id="bR1off"  type="button">R1 off</button>
+      <button id="bR2on"   type="button">R2 on</button>
+      <button id="bR2off"  type="button">R2 off</button>
+      <button id="bR3on"   type="button">R3 on</button>
+      <button id="bR3off"  type="button">R3 off</button>
+      <button id="bR4on"   type="button">R4 on</button>
+      <button id="bR4off"  type="button">R4 off</button> 
     </form>
     </div>
     <div id='divNachrichten'>
