@@ -12,30 +12,77 @@ Die Tasmota-Devices senden per mqtt an fhem
 Bisher läuft 
  - Der Webserver mit websockets (da ich ihn vorher hatte)
  - Power wird dargestellt, habe pubsub mqtt client genommen
- - Servo lässt sich testweise drehen    
+ - Servo lässt sich testweise drehen
+ - Werte aus mqtt werden dargestellt
+ - Relais lassen sich testweise schalten
+ - bluetti wird ausgelesen und schalten geht 
+ - Bluetti von mqtt abgekapselt, eigene "Bibliothek" geschrieben
+   ist nicht perfekt aber geht
+ - alles auf github geschoben     
+ - dieses gerät kann als mqtt in fhem eingebunden werden, es bekommt von fhem 
+   die daten gesendet
  
-zu bluetti projekt gefunden und erstmal herein kopiert
-Problem: das nutzt platformio - die moderne Variante, aber die verstehe ich noch nicht 
-nein, tut es nicht - es hat beides
+littlefs macht aerger - seltsam - brauche ich das? - erstmal raus
 
-Starte mal ein neues Projekt in einem neuen Ordner, erstmal sehen, ob ich meinen bisherigen kram 
-zum laufen bekomme
-füge meinen code mal zur main.cpp hinzu
-in platformio füge AsyncElegantOta hinzu (library manager)
--> weniger rot :-)
-baue nach und nach libs ein
-littlefs macht aerger - seltsam 
+Rahmenbedingungen hier: 
+ Grundverbrauch ca. 80 W wenn nichts läuft
+ Speicherwürfel Bluetti kann einspeisen, zwischen 0 und 150 Watt ist es sinnvoll
+ geht nur bis 150-200 Watt, dann heizt der Inverter zu viel - von wegen 500 W
+ die Leistung, die der Inverter liefert und die die Bluetti liefert weichen 
+ immer stärker voneinander ab. 
 
-es geht wohl irgendwie aber ich lasse alles damit erstmal weg, da ich es nicht brauche
-alles mit littlefs erstmal raus geworfen, compiliert, lädt hoch monitor geht nichth 
-speed stimmt nicht
-und nach ein paar weiteren versuchen geht gar nichts mehr - so ein schrott auch nicht besser als arduino 
-habe in der platform io ini die geschwindigkeit auf 115200 gesetzt, neu gestartet, dann ging der monitor 
-und auch upload geht wieder (lief einer Zeit lang nicht, unklar)
+ sinnvolle automatisierung wäre (Bluetti bei 10% ausschalten, auch wenn sie selbst abschaltet, 
+ und Lithium tiefentladung eigentlich egal ist, wer weiß wie gut das geht) 
+ Wenn Solar <= Hausverbrauch oder Hausverbrauch groesser als 400 Watt 
+    Verbrauchen, beide Panels am Deye-Inverter
+    regle Bluetti Inverter (wenn mehr als 10%)
+ sonst 
+    wenn Bluetti <=95%
+       wenn Hausverbrauch groesser als  150 Watt 
+            ein Panel an Deye, eines an Bluetti (mehr als 400 s. oben)
+            evtl. regle Bluetti dazu 
+       sonst  
+         Lade Bluetti mit 2 Panels und regle Bluetti Inverter
+    sonst 
+       beide Panels an Deye Inverter
 
-so komme ich auf jeden Fall nicht weeiter, ich kann das Bluetti Projekt nicht in meines einbinden, vielleicht anders heraum 
-nein, vielleicht geht es, in dem ich die Arduino ide verwende, da funktionierte ja das File-System, wobei ich das eigentlich überhaupt nicht 
-brauche 
+Manuelles schalten sollte möglich sein, Automatik dann aus 
+Regelung des Inverters mittels Servos sollte eine Art hysterese berücksichtigen, damit das Teil nicht dauernd dreht
 
-Doch einiges weiter gekommen, kann jetzt das Gerät als mqtt2 device in fhem einbinden, habe ein wenig im raspiFHEM Ordner notiert
+
+Schaltung mit 4er Relais, für Voll laden von Bluetti müssen die Panels in Reihe geschaltet sein
+der Deye-Inverter hat 2x2 Eingänge für je ein Panel 
+
+quer richtung normally open, also ein, wenn Relais "an geschaltet"
+
+      Panel1-   Panel1+           Panel2-  Panel2+ 
+       |           |in              |in        |
+       |           R2---------------R3         |in
+       |in         |nc              |nc        R4------- Blue + 
+       R1---------------------------x----------|-------- Blue - 
+       |nc         |                |          |nc     
+       |           |                |          |        
+       |           |-------         |          |
+       |                  |         |          |
+       Deye1-   Deye2- ---|---------|          |
+                          |                    |
+       Deye1+   Deye2+ ---|--------------------|
+         |----------------|
+       
+       
+       R1-R4 geschaltet:           Bluetti wird voll geladen 
+
+       R1-R4 nicht geschaltet:     Deye1 wird versorgt und Deye2 wird versorgt
   
+       R1,R2,R3 nicht geschaltet      Deye 1 wird versorgt und Blue über Panel 2geladen 
+       R4 geschaltet  
+       
+       R1 geschaltet, R2 nicht, evtl. doof Deye1 hat + aber keinen Bezug , also R2 vor R1 schalten (sollte aber egal sein)
+       R2 geschaltet, R3 nicht, evtl. doof + P1 liegt auf - Deye2 - nicht machen R3 vorher schalten  
+       R1 geschaltet, R3 nicht, evtl. auch doof Panel1 und Panel 2 bekommen gemeinsames - mögen sie das? (auch egal?) 
+       
+       also beim Wechsel Bluetti -> Deye Reihenfolge R1,2,3, ggf. 4 aus
+       beim Wechsel von Bluetti + deye auf Bluetti -> Reihenfolge R3, R1, R2 ein
+       Wechsel Blue + Deye auf Deye -> R1,R2,R3, R4 aus  
+       Wechsel Deye auf Blue -> R3, R2, R4, R1 einschalten (hier wichtig R3 vor R2)
+       das müsste es doch sein 

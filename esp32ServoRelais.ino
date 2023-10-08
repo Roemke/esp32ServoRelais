@@ -93,6 +93,11 @@ long lastMsg = 0;
 WiFiClient wifiClient; //nicht ganz klar - ein Client der die Verbindung nutzen kann
 PubSubClient mqttClient(wifiClient); 
 
+//mqtt funktioniert so weit erstmal, kann ich das auf http-Client umstellen + Bluetooth - ich kann ja eigentlich
+//alle Werte sinnvoll über http abfragen, es sind alles tasmota teile, dann bin ich nicht auf mqtt angewiesen 
+//mqtt auf tasmota aktualisiert nur alle 10 Sekunden mache mal einen branch mqtt - der ist nicht fertig, wenn http geht
+//wird er auch nicht weiter entwickelt :-)
+
 //bluetti fertig stellen
 //der callback - vielleicht besser 
 //von der Bluetti-Klasse erben und mit virtuellen Methode arbeiten?
@@ -457,19 +462,6 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
             schalteRelais( doc["value"]);
           }
         }
-        //Serial.println("Rfids2");
-        //rfidsOk.serialPrint();
-        //Serial.println("new");
-        //rfidsNew.serialPrint();
-        
-        /*String s = (char * ) data;
-        unsigned int pos = s.indexOf("|");
-        newRfidId = s.substring(0,pos);
-        newRfidOwner = s.substring(pos+1);
-        */
-        //Serial.print("Received from client: ");
-        //Serial.println(s);
-        //Serial.println(" have rfid:" +  newRfidId + " and owner: " + newRfidOwner);
     }
 }
 
@@ -508,7 +500,6 @@ void schalteRelais(const char * value) //muss const char * sein sonst meckert di
     digitalWrite(pin,mode);
     sprintf(msg,"Write to pin %d mode is %d",pin,mode);
     wsMsgSerial(msg);
-    
   }
 }
 
