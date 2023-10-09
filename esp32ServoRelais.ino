@@ -105,12 +105,57 @@ PubSubClient mqttClient(wifiClient);
 //mqtt auf tasmota aktualisiert nur alle 10 Sekunden mache mal einen branch mqtt - der ist nicht fertig, wenn http geht
 //wird er auch nicht weiter entwickelt :-)
 
+//--------------------websocket kram 
+void wsMessage(const char *message,AsyncWebSocketClient * client = 0)
+{ 
+  const char * begin = "{\"action\":\"message\",\"text\":\"";
+  const char * end = "\"}";
+  char * str = new char[strlen(message)+strlen(begin)+strlen(end)+24];//Puffer +24 statt +1 :-)
+  strcpy(str,begin);
+  strcat(str,message);
+  strcat(str,end);
+  if (!client)
+    ws.textAll(str);
+  else
+    client->text(str);
+    
+  delete [] str;
+}
+
+void wsMsgSerial(const char *message, AsyncWebSocketClient * client = 0)
+{
+  wsMessage(message,client);
+  Serial.println(message);
+}
+
+//daten aus dem Power-Objekt an die Clients senden
+void informClients()
+{
+  char *json =  power.getJSON("power");
+  ws.textAll(json);
+}
+//alle daten, die am Anfang gebraucht werden 
+void sendAvailableData(AsyncWebSocketClient * client, AsyncWebSocket *server)
+{
+   //sende die Daten an den Client
+   wsMessage(startmeldungen.htmlLines().c_str(),client);
+   String msg = String("WebSocket client ") + String(client->id()) + String(" connected from ") +  client->remoteIP().toString();
+   wsMsgSerial(msg.c_str());
+   msg = String("Anzahl Clients: ") + server->count();
+   wsMsgSerial(msg.c_str());
+}
+
 //bluetti fertig stellen
 //der callback - vielleicht besser 
 //von der Bluetti-Klasse erben und mit virtuellen Methode arbeiten?
 void bleNotifyCallback(char * topic , String value)
 {
   //Serial.println("We have topic " + topic + " and val " + value);
+  char msg[128];
+  strcpy(msg,"in Callback, topic is");
+  strcat(msg,topic);
+  wsMsgSerial(msg);
+
   char * str = 0;
   const char * end = "}";
   if (!strcmp(topic,"total_battery_percent"))
@@ -120,6 +165,8 @@ void bleNotifyCallback(char * topic , String value)
     strcpy (str,begin);
     strcat (str,value.c_str());
     strcat (str,end);
+    power.bluettiPercent = value.toInt();
+    power.eBluetti = false;
   }
   else if (!strcmp(topic, "dc_input_power"))
   {
@@ -128,6 +175,8 @@ void bleNotifyCallback(char * topic , String value)
     strcpy(str,begin);
     strcat (str,value.c_str());
     strcat (str,end);      
+    power.bluettiIn = value.toInt();
+    power.eBluetti = false;
   }
   /* an aus ist überflüssig - nee doch nicht, muss nur nicht angezeigt werden */
   else if (!strcmp(topic , "dc_output_on"))
@@ -136,9 +185,17 @@ void bleNotifyCallback(char * topic , String value)
     str = new char [strlen(begin) + 24 ];
     strcpy(str,begin);
     if (value=="0")
+    {
       strcat(str,"\"off\"");
+      power.bluettiDCState = false;
+      power.eBluetti = false;
+    }
     else
+    {
       strcat(str,"\"on\"");
+      power.bluettiDCState = true;
+      power.eBluetti = false;
+    }
     strcat(str,end);
   }
   else if (!strcmp(topic, "dc_output_power"))
@@ -148,6 +205,8 @@ void bleNotifyCallback(char * topic , String value)
     strcpy(str,begin);
     strcat (str,value.c_str());
     strcat (str,end);    
+    power.bluettiOut = value.toInt();
+    power.eBluetti = false;
   }
   if (str)  
     ws.textAll(str);
@@ -311,40 +370,6 @@ String processor(const String& var)
 }
 
 
-//--------------------websocket kram 
-void wsMessage(const char *message,AsyncWebSocketClient * client = 0)
-{ 
-  const char * begin = "{\"action\":\"message\",\"text\":\"";
-  const char * end = "\"}";
-  char * str = new char[strlen(message)+strlen(begin)+strlen(end)+24];//Puffer +24 statt +1 :-)
-  strcpy(str,begin);
-  strcat(str,message);
-  strcat(str,end);
-  if (!client)
-    ws.textAll(str);
-  else
-    client->text(str);
-    
-  delete [] str;
-}
-
-void wsMsgSerial(const char *message, AsyncWebSocketClient * client = 0)
-{
-  wsMessage(message,client);
-  Serial.println(message);
-}
-
-
-//alle daten, die am Anfang gebraucht werden 
-void sendAvailableData(AsyncWebSocketClient * client, AsyncWebSocket *server)
-{
-   //sende die Daten an den Client
-   wsMessage(startmeldungen.htmlLines().c_str(),client);
-   String msg = String("WebSocket client ") + String(client->id()) + String(" connected from ") +  client->remoteIP().toString();
-   wsMsgSerial(msg.c_str());
-   msg = String("Anzahl Clients: ") + server->count();
-   wsMsgSerial(msg.c_str());
-}
 
 //bei einem connect muesste ich doch eigentlich die notwendigen Daten an den speziellen client 
 //senden koennen. Ich war ein wenig in der "Ajax-Denke" gefangen - da hat der Client die Daten 
@@ -589,22 +614,24 @@ void loop() {
                        // manchmal verabschieden sich clients wohl unsauber / gar nicht -> werden wir brutal
 
     //power auslesen
-    //powerGet(Power &power);
+    wsMsgSerial("in loop try to read power");
+    power.getByWebApi();
   }  
 
   if (!mqttClient.connected()) {
     reconnect();
   }
   mqttClient.loop();
-  blue.handleBluetooth();
-
+  char *msg = blue.handleBluetooth();
+  wsMsgSerial(msg);
   //send information to mqtt --------------------------------------------------
   long now = millis();
   int del = now - lastMsg;
-  if (del > 15000) 
+  if (del > 5000) //alle 5 Sekunden 
   {
     lastMsg = now;
     mqttClient.publish("esp32solar/state","online");
+    informClients(); //
     //Serial.println("try to publish esp32solar/state online");
   }  
   delay(2000);

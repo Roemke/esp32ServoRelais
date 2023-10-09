@@ -17,15 +17,19 @@ class Power {
     int house;           //aus webapi
     int blueInverter;    //aus webapi
     int deyeInverter;    //aus webapi
-    int bluetti;         //aus bluetooth 
-    int bluettiPercent;  //aus bluetooth
+    int bluettiOut;         //aus bluetooth ab hier
+    int bluettiIn;
+    int bluettiPercent; 
+    bool bluettiDCState; 
 
     //Mittelwerte
+    /* das ist noch nicht durchdacht  
     int mHouse;           
     int mBlueInverter; 
     int mDeyeInverter;    
     int mBluetti;         
     int mBluettiPercent;  
+    */
 
     //Fehler 
     bool eHouse;
@@ -34,23 +38,24 @@ class Power {
     bool eBluetti;  //bluetooth
 
     //zaehler fuer die Mittelwerte
+    /*
     int blueCounter; 
     int apiCounter; 
-
+    */
     //Methoden 
     public:
       Power()
       {
-        eHouse = eBlueInverter = eDeyeInverter = eBluetti = true; 
+        eHouse = eBlueInverter = eDeyeInverter = eBluetti = true;
+        bluettiDCState = false; 
       }
       void getByWebApi();
+      char *getJSON(const char *action);
     
     private:
       const char * httpGet(char *fullRequest);
       //standard-Tasmotasteckdose
-      void readTasmotaSteckdose(char *getString, int &power, bool &error);
-    
-    
-    
+      void readTasmotaSteckdose(char *getString, int &power, bool &err);
+           
 };
 #endif
