@@ -86,3 +86,4 @@ quer richtung normally open, also ein, wenn Relais "an geschaltet"
        Wechsel Blue + Deye auf Deye -> R1,R2,R3, R4 aus  
        Wechsel Deye auf Blue -> R3, R2, R4, R1 einschalten (hier wichtig R3 vor R2)
        das müsste es doch sein 
+       

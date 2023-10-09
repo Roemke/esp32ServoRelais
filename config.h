@@ -6,6 +6,8 @@
 
 #define EEPROM_SALT 13374
 
+//naja, habe mqtt ein wenig heraus genommen 
+
 #define DEVICE_NAME "BLUETTI-MQTT"
 #define BLUETTI_TYPE AC200M
 
@@ -24,6 +26,8 @@
 #ifndef BLUETTI_TYPE
   #define BLUETTI_TYPE AC300
 #endif
+
+
 
 
 

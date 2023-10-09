@@ -6,8 +6,12 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>//mist, der braucht den ESPAsyncWebServer, habe mal in der Bibliothek angepasst, so dasss es auch mit ESPAsyncWebSrv.h geht
-#include <ArduinoJson.h>   //und wieder zurück, nehme den AsyncWebServer Bibliothek manuell installiert aus zip
-#include <PubSubClient.h>
+                              //und wieder zurück, nehme den AsyncWebServer Bibliothek manuell installiert aus zip
+#include <ArduinoJson.h> //ArduinoJson hat ein anderes Speicherkonzept als Arduino_Json
+#include <PubSubClient.h> //mqtt
+#include <HTTPClient.h>
+
+
 #define DEBUG 1
 //----------------------------------die Bluetti betreffend
 #define AC200M          2
@@ -39,6 +43,7 @@ bluetti_command_t bluettiCommand = {bluetti_polling_command,sizeof(bluetti_polli
 
 #include "ownLists.h"
 #include "index_htmlWithJS.h" //variable mit dem HTML/JS anteil
+#include "power.h"
 /*
  * Alte Datei kopiert und auf servo reais etc angepasst, Steuerung / Auslesen der Werte Solar und Strom-Kram 
  * Leider probleme mit dem selbst gebastelten (nach diversen Tutorials) webserver
@@ -61,8 +66,10 @@ const char * ssid = mySSID;
 const char *password = myPASSWORD;
 
 
-
+ 
 ObjectList <String> startmeldungen(16); //dient zum Puffern der Meldungen am Anfang
+
+Power power; //fuer die Werte die über Bluetooth, eigene Api-Calls entstehen, mqtt registrierung bei fhem nehme ich später mal raus 
 
 Servo servo;
 static const int servoPin = 15;//ist io15 = tdo
@@ -203,7 +210,7 @@ void mqttCallback(char* topic, byte* message, unsigned int length) {
     strcat(str,end);
     //Serial.print("Sende ");
     //Serial.println(str);
-    ws.textAll(str);
+    //ws.textAll(str);
     
     delete [] str;          
   }
@@ -223,7 +230,7 @@ void mqttCallback(char* topic, byte* message, unsigned int length) {
     strcat(str,end);
     //Serial.print("Sende ");
     //Serial.println(str);
-    ws.textAll(str);
+    //ws.textAll(str);
     
     delete [] str;              
   }
@@ -241,7 +248,7 @@ void mqttCallback(char* topic, byte* message, unsigned int length) {
     strcat(str,end);
     //Serial.print("Sende ");
     //Serial.println(str);
-    ws.textAll(str);
+    //ws.textAll(str);
     
     delete [] str;                  
   }
@@ -503,6 +510,8 @@ void schalteRelais(const char * value) //muss const char * sein sonst meckert di
   }
 }
 
+
+
               
 //--------------------------------------------------------------------
 void setup() {
@@ -577,7 +586,10 @@ void loop() {
   if (WiFi.status() == WL_CONNECTED)
   {
     ws.cleanupClients(); // aeltesten client heraus werfen, wenn maximum Zahl von clients ueberschritten, 
-                       // manchmal verabschieden sich clients wohl unsauber / gar nicht -> werden wir brutal  
+                       // manchmal verabschieden sich clients wohl unsauber / gar nicht -> werden wir brutal
+
+    //power auslesen
+    //powerGet(Power &power);
   }  
 
   if (!mqttClient.connected()) {
@@ -588,12 +600,13 @@ void loop() {
 
   //send information to mqtt --------------------------------------------------
   long now = millis();
-  int delay = now - lastMsg;
-  if (delay > 15000) 
+  int del = now - lastMsg;
+  if (del > 15000) 
   {
     lastMsg = now;
     mqttClient.publish("esp32solar/state","online");
     //Serial.println("try to publish esp32solar/state online");
   }  
+  delay(2000);
   //---------------------------------------------------------------------------
 }
