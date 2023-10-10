@@ -1,5 +1,5 @@
 
-#include <Servo.h>
+//#include <Servo.h>
 #include <WiFi.h>
 #include <ArduinoOTA.h>
 #include <Preferences.h>        
@@ -12,7 +12,7 @@
 #include <HTTPClient.h>
 
 
-#define DEBUG 1
+//#define DEBUG 1
 //----------------------------------die Bluetti betreffend
 #define AC200M          2
 #define BLUETTI_TYPE AC200M //noetig vor dem Einbinden der Bibliothek
@@ -71,8 +71,8 @@ ObjectList <String> startmeldungen(16); //dient zum Puffern der Meldungen am Anf
 
 Power power; //fuer die Werte die über Bluetooth, eigene Api-Calls entstehen, mqtt registrierung bei fhem nehme ich später mal raus 
 
-Servo servo;
-static const int servoPin = 15;//ist io15 = tdo
+//Servo servo;
+//static const int servoPin = 15;//ist io15 = tdo
 
 //und die Relais
 const int r1pin = 26; 
@@ -148,70 +148,41 @@ void sendAvailableData(AsyncWebSocketClient * client, AsyncWebSocket *server)
 //bluetti fertig stellen
 //der callback - vielleicht besser 
 //von der Bluetti-Klasse erben und mit virtuellen Methode arbeiten?
-void bleNotifyCallback(char * topic , String value)
+void bleNotifyCallback(const char * topic , String value)
 {
   //Serial.println("We have topic " + topic + " and val " + value);
+  #ifdef DEBUG
   char msg[128];
   strcpy(msg,"in Callback, topic is");
   strcat(msg,topic);
+  #endif
   wsMsgSerial(msg);
-
-  char * str = 0;
-  const char * end = "}";
   if (!strcmp(topic,"total_battery_percent"))
   {
-    const char * begin = "{\"action\":\"bluettiPercent\",\"data\":";
-    str = new char[strlen(begin) + value.length() + strlen(end) + 24 ];
-    strcpy (str,begin);
-    strcat (str,value.c_str());
-    strcat (str,end);
     power.bluettiPercent = value.toInt();
     power.eBluetti = false;
   }
   else if (!strcmp(topic, "dc_input_power"))
   {
-    const char * begin = "{\"action\":\"blue_dc_input_power\",\"data\":";
-    str = new char[strlen(begin) + value.length() + strlen(end) + 24 ];
-    strcpy(str,begin);
-    strcat (str,value.c_str());
-    strcat (str,end);      
     power.bluettiIn = value.toInt();
     power.eBluetti = false;
   }
   /* an aus ist überflüssig - nee doch nicht, muss nur nicht angezeigt werden */
   else if (!strcmp(topic , "dc_output_on"))
   {
-    const char * begin = "{\"action\":\"bluettiDC\",\"data\":";
-    str = new char [strlen(begin) + 24 ];
-    strcpy(str,begin);
-    if (value=="0")
-    {
-      strcat(str,"\"off\"");
-      power.bluettiDCState = false;
-      power.eBluetti = false;
-    }
-    else
-    {
-      strcat(str,"\"on\"");
-      power.bluettiDCState = true;
-      power.eBluetti = false;
-    }
-    strcat(str,end);
+    power.eBluetti = false;
+    power.bluettiDCState = (value == "0") ? false : true;
   }
   else if (!strcmp(topic, "dc_output_power"))
   {
-    const char * begin = "{\"action\":\"blue_dc_output_power\",\"data\":";
-    str = new char[strlen(begin) + value.length() + strlen(end) + 24 ];
-    strcpy(str,begin);
-    strcat (str,value.c_str());
-    strcat (str,end);    
     power.bluettiOut = value.toInt();
     power.eBluetti = false;
   }
-  if (str)  
-    ws.textAll(str);
 
-  delete [] str;
+  #ifdef DEBUG
+  sprintf(msg,"Power: State: %d Percent %d out %d in %d",power.bluettiDCState, power.bluettiPercent,power.bluettiOut,power.bluettiIn);
+  wsMsgSerial(msg);
+  #endif
 }
 
 Bluetti blue("AC200M2308002058882",bluettiCommand,bleNotifyCallback); //die bluetoothid, das command fuer das modell und der Callback 
@@ -411,12 +382,6 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         //String s = cData; //legt eine Kopie an
         String message;
         const int capacity = JSON_OBJECT_SIZE(3)+2*JSON_OBJECT_SIZE(3);//+JSON_ARRAY_SIZE(RFID_MAX); //
-        //bisher ein Objekt mit 3 membern und RFID_MAX Objekte mit 3 membern (die authorisierten rfids, maximal RFID_MAX), aber das ist ein Array mit RFID_MAX Objekten, 
-        //lieber auf Nr sicher gehen
-        //Serial.println("Rfids1");
-        //rfidsOk.serialPrint();
-        //Serial.println("new");
-        //rfidsNew.serialPrint();
         
         StaticJsonDocument<capacity> doc; //hinweis: doc nur einmal verwenden 
         Serial.println("we have in WebSocketMessage: ");
@@ -441,7 +406,15 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
           else if (strcmp(doc["action"],"dc_output_on") ==0)
           {
               //String state =  (const char *) doc["value"];
-              blue.switchOut("dc_output_on", (const char *) doc["value"]);  
+              if ( !strcmp((const char *) doc["value"],"toggle") )
+              {
+                  if(power.bluettiDCState)
+                    blue.switchOut("dc_output_on","off");
+                  else 
+                    blue.switchOut("dc_output_on","on");
+              }
+              else
+                blue.switchOut("dc_output_on", (const char *) doc["value"]);  
               //info an angeschlossene devices / smartphone muesste ueber bluetti(bluetooth)->dieser esp(websocket)-> angeschlosse devices laufen
           }
           else if ( strcmp(doc["action"],"servo")==0)
@@ -472,7 +445,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
                 else if (!strcmp(doc["value"],"right"))
                    val = 70; 
                 
-                servo.write(val);    
+                //servo.write(val);    
           }
           else if (strcmp(doc["action"],"keepWebServerAlive")==0) 
           {
@@ -544,8 +517,18 @@ void setup() {
   Serial.begin(115200);
 
   //Servo Geschichte 
-  servo.attach(servoPin);
-
+  const int frequency = 200; // Hz
+  //servo.attach(servoPin);
+  /*
+  servo.attach(
+    servoPin, 
+    Servo::CHANNEL_NOT_ATTACHED, 
+    Servo::DEFAULT_MIN_ANGLE, 
+    Servo::DEFAULT_MAX_ANGLE, 
+    Servo::DEFAULT_MIN_PULSE_WIDTH_US, 
+    Servo::DEFAULT_MAX_PULSE_WIDTH_US, 
+    frequency);
+ */
   //pins setzen 
   pinMode(r1pin ,OUTPUT); 
   pinMode(r2pin ,OUTPUT);
@@ -622,8 +605,7 @@ void loop() {
     reconnect();
   }
   mqttClient.loop();
-  char *msg = blue.handleBluetooth();
-  wsMsgSerial(msg);
+  blue.handleBluetooth();
   //send information to mqtt --------------------------------------------------
   long now = millis();
   int del = now - lastMsg;

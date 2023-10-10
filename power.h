@@ -48,6 +48,7 @@ class Power {
       {
         eHouse = eBlueInverter = eDeyeInverter = eBluetti = true;
         bluettiDCState = false; 
+        house = blueInverter = deyeInverter = bluettiOut = bluettiIn = bluettiPercent = 0;
       }
       void getByWebApi();
       char *getJSON(const char *action);

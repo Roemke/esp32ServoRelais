@@ -41,6 +41,9 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         border: 2px solid darkgreen;
         padding: 2em;
       }
+      #dateTime {
+        font-weight: normal;
+      }
       #controlContainer {
           display: grid;
           position: sticky;
@@ -117,42 +120,29 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
               case "message":
                 document.getElementById("iMessage").innerHTML += data.text + "<br>";
                 break;
-              case "powerHouse":
+              case "power": 
+                let vDateTime = document.getElementById("dateTime"); 
                 let vph = document.getElementById("valPowerHouse"); 
-                vph.innerHTML = data.data.Power.Power_curr + " W (" + data.data.Time + ")";
-                break;
-              case "bluettiPercent":
-                let vBP = document.getElementById("valBluettiPercent");
-                vBP.innerHTML = data.data + "% (" + now.toLocaleDateString('en-CA') + 
-                                " " + now.toLocaleTimeString('de-DE') + ")";
-                break;
-              case "bluettiDC":
-                bluettiOn = (data.data == "on") ? true : false; 
-                break;
-              case "blue_dc_input_power":
-                let vBSolarP = document.getElementById("valSolarBluePower"); 
-                vBSolarP.innerHTML = data.data + 
-                                "W (" + now.toLocaleDateString('en-CA') + 
-                                " " + now.toLocaleTimeString('de-DE') + ")";
-                break;  
-              case "blue_dc_output_power":
-                let vBDCP = document.getElementById("valBluePower");
-                vBDCP.innerHTML = data.data + 
-                                "W B(" + now.toLocaleDateString('en-CA') + 
-                                " " + now.toLocaleTimeString('de-DE') + ")";
-                break;
-              case "powerBluettiInverter":
-                let vBIP = document.getElementById("valBlueInvPower"); 
-                vBIP.innerHTML = data.data.ENERGY.Power + 
-                                "W I(" + now.toLocaleDateString('en-CA') + 
-                                " " + now.toLocaleTimeString('de-DE') + ")";
-                break;
-              case "powerSolarDeye":
                 let vSDP = document.getElementById("valSolarDeyePower"); 
-                vSDP.innerHTML = data.data.ENERGY.Power + 
-                                "W (" + now.toLocaleDateString('en-CA') + 
-                                " " + now.toLocaleTimeString('de-DE') + ")";
-                break;
+                let vBIP = document.getElementById("valBlueInvPower");
+
+                let vBSolarP = document.getElementById("valSolarBluePower"); 
+                let vBDCP = document.getElementById("valBluePower");
+                let vBP = document.getElementById("valBluettiPercent");
+                
+                vDateTime.innerHTML =  "(" + now.toLocaleDateString('en-CA') + 
+                                       " " + now.toLocaleTimeString('de-DE') + ")";
+                
+
+                vph.innerHTML = (!data.values.eHouse) ? data.values.powerHouse + " W " : '?'; 
+                vSDP.innerHTML = (!data.values.eDeyeInverter) ? data.values.powerDeyeInv + " W I." : '?';
+                vBIP.innerHTML = (!data.values.eBlueInverter) ? data.values.powerBlueInv + " W I." : '?';                                
+                                 
+                vBSolarP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiIn + " W" : '?'; 
+                vBDCP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiOut + " W": '?'; 
+                vBP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiPercent + " %": "?" ;
+                
+              break;
             } 
          }
       }
@@ -182,10 +172,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         });
         document.getElementById('bToggleDC').addEventListener("click",() => 
         { 
-          if (!bluettiOn)
-            websocket.send(JSON.stringify({'action':'dc_output_on','value':'on'}));
-          else             
-            websocket.send(JSON.stringify({'action':'dc_output_on','value':'off'}));
+            websocket.send(JSON.stringify({'action':'dc_output_on','value':'toggle'}));
         });        
         //die relais testen -> buttons im form
         let fButtons = fRelais.querySelectorAll("#fRelais > button"); //sollten 8 sein 
@@ -207,7 +194,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         <button type="button" id="bReboot">reboot Esp</button>
     </div>
     <div class="framed">
-      <h2>Information</h2>
+      <h2>Information <span id="dateTime">?</span></h2>
       <table>
         <tr>
           <td>P. Haus</td><td><span id="valPowerHouse">?</span></td>

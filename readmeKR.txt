@@ -87,3 +87,17 @@ quer richtung normally open, also ein, wenn Relais "an geschaltet"
        Wechsel Deye auf Blue -> R3, R2, R4, R1 einschalten (hier wichtig R3 vor R2)
        das müsste es doch sein 
        
+
+schade, nachdem sehr viel lief habe ich updates laufen lassen, da die arduino ide herum zickte (fehlermeldungen)
+und bin auf arduino 2.1 gewechselt. jetzt bekomme ich den Servo nicht mehr zum laufen 
+Bluetooth funktioniert auch nicht mehr, scheint sich aufzuhängen, warning beim compilieren
+
+warning beim compilieren lässt sich eliminieren, durch verwendung anderer methode, aber das ganze
+funktioniert nicht mehr, ich bekomme keine Verbindung mehr zu dem Teil
+Problem ist natürlich auch, dass ich die Bluetooth funktionalität kopiert habe um dann eine eigene klasse zu 
+bauen, ohne die Thematik wirklich zu verstehen.
+
+Nein, das stimmt so nicht, der connect funktioniert, den Write Request kann ich senden, offenbar liefert Bluetti Bluetooth dann
+eine Antwort - jedenfalls wenn man die 1.4.0 der Bibliothek verwendet, in der 1.4.1 wird mein Callback nicht aufgerufen. 
+
+
