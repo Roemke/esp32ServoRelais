@@ -173,8 +173,28 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         document.getElementById('bToggleDC').addEventListener("click",() => 
         { 
             websocket.send(JSON.stringify({'action':'dc_output_on','value':'toggle'}));
-        });        
-        //die relais testen -> buttons im form
+        });
+        //anpassen der Leistung von Bluetti ins Hausnetz
+        document.getElementById('bAdjustBluetti').addEventListener("click",() => 
+        { 
+            websocket.send(JSON.stringify({'action':'adjustBluetti','value':''}));
+        });
+        //Ladeverhalten, Relais schalten
+        document.getElementById('bBluettiOnly').addEventListener("click",() => 
+        { 
+            websocket.send(JSON.stringify({'action':'changeCharge','value':'bluettiOnly'}));
+        });
+        document.getElementById('bDeyeOnly').addEventListener("click",() => 
+        { 
+            websocket.send(JSON.stringify({'action':'changeCharge','value':'deyeOnly'}));
+        });
+        document.getElementById('bDeyeBluetti').addEventListener("click",() => 
+        { 
+            websocket.send(JSON.stringify({'action':'changeCharge','value':'bluettiDeye'}));
+        });
+        //--------------
+        //die relais testen -> buttons im form, im Betrieb nicht sinnvoll, die Relais dürfen nicht unabhängig geschaltet werden !
+        /*
         let fButtons = fRelais.querySelectorAll("#fRelais > button"); //sollten 8 sein 
         fButtons.forEach( element => 
         {
@@ -184,6 +204,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
              websocket.send(JSON.stringify({'action':'relais','value':evt.target.id}));
            });
         });
+        */
          
       }); 
     </script>
@@ -225,8 +246,14 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       <button id="bServoRight" type="button">Servo Right</button> <!-- immer noch (2023-09) ein Button sendet ab außer er ist type button -->
       <button id="bServoStop"  type="button">Servo Stop</button> <!-- immer noch (2023-09) ein Button sendet ab außer er ist type button -->
     </form>
+    <form>
+          <button id="bAdjustBluetti"  type="button">BluettiOut anpassen</button>
+          <button id="bBluettiOnly"  type="button">Bluetti voll laden</button>
+          <button id="bDeyeOnly"  type="button">nur Haus versorgen (Deye)</button>
+          <button id="bDeyeBluetti"  type="button">Haus versorgen, Bluetti laden</button>
+    </form>
+    <!-- relais dürfen nicht mehr unabhängig geschaltet werden 
     <form id="fRelais">
-      <!-------- Relais testen --->
       <button id="bR1on"   type="button">R1 on</button>
       <button id="bR1off"  type="button">R1 off</button>
       <button id="bR2on"   type="button">R2 on</button>
@@ -235,7 +262,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       <button id="bR3off"  type="button">R3 off</button>
       <button id="bR4on"   type="button">R4 on</button>
       <button id="bR4off"  type="button">R4 off</button> 
-    </form>
+    </form> -->
     </div>
     <div id='divNachrichten'>
      Nachrichten <button id='bClear' type='button'>(clear)</button>: 

@@ -1,5 +1,17 @@
 
-//#include <Servo.h>
+/*
+Information über und Steuerung der kleinen Solaranlage zu Hause. 
+zwei Panels a 420 W, ein Deye-Inverter, ein Bluetti Würfel
+Bluetti benötigt ideal eine Reihenschaltung, deye hat 2 x 2 Eingänge, Reihe geht nicht
+kleiner 12 V inverter der angeblich 500 W kann (bei 180 heizt er nur noch...) Regelung über eine 
+kleine Schraube möglich -> servo
+getestet mit Esp32 D1 Mini, Partition Schema Minimal SPIFFS sonst dürfte OTA nicht gehen
+todo: 
+  - paar Warnings
+  - Asynch Webserver geht inzwischen woll besser, s. Warning
+  - Servo hier nur in alter Version, neue braucht gnu++17 damit geht aber der esp nicht
+  - NimBLE - Version 1.4.0 genutzt, 1.4.1 tut es nicht für mich, bekomme keine Antwort von der Bluetti
+**/
 #include <WiFi.h>
 #include <ArduinoOTA.h>
 #include <Preferences.h>        
@@ -10,6 +22,8 @@
 #include <ArduinoJson.h> //ArduinoJson hat ein anderes Speicherkonzept als Arduino_Json
 #include <PubSubClient.h> //mqtt
 #include <HTTPClient.h>
+
+#include <Servo.h>
 
 
 //#define DEBUG 1
@@ -71,8 +85,8 @@ ObjectList <String> startmeldungen(16); //dient zum Puffern der Meldungen am Anf
 
 Power power; //fuer die Werte die über Bluetooth, eigene Api-Calls entstehen, mqtt registrierung bei fhem nehme ich später mal raus 
 
-//Servo servo;
-//static const int servoPin = 15;//ist io15 = tdo
+Servo servo;
+static const int servoPin = 15;//ist io15 = tdo
 
 //und die Relais
 const int r1pin = 26; 
@@ -372,6 +386,61 @@ void onWSEvent(AsyncWebSocket       *server,  //
             break;
      }
 }
+
+void adjustBluetti()
+{
+   const int stop = 92;
+  
+  int dir=stop;
+
+  wsMsgSerial("Adjust Bluetti");
+  if (!power.eBluetti && power.bluettiPercent > 10)
+  {
+    if (power.house > 0)
+    {
+      blue.switchOut("dc_output_on","on");
+      wsMsgSerial("Hausverbrauch > 0, passe an");
+      delay (1000);
+      power.getByWebApi();
+    }
+    if (power.house > 0)
+    { //bluetti erhöhen so möglich
+      while  (power.house > 5 && power.bluettiPercent > 10 && !power.eBluetti && power.blueInverter < 150)
+      {
+        dir = 85;
+        servo.write(dir);
+        delay(500);
+        servo.write(stop);      
+        power.getByWebApi();
+        delay(500);
+      }
+    } 
+    else if (power.house < 0)
+    {
+      wsMsgSerial("Hausverbrauch <0, passe an");
+      while  (power.house < 5 && power.blueInverter>38) //kleiner als 34 klappt nicht 
+      {
+        dir = 99;
+        servo.write(dir);
+        delay(500);
+        servo.write(stop);      
+        power.getByWebApi();
+        delay(500);
+      }  
+      if (power.house < -5)
+      {
+        blue.switchOut("dc_output_on","off");
+        wsMsgSerial("Verbrauch < -5 schalte Blue aus");
+      }
+    }
+  }
+  else 
+  {
+    wsMsgSerial("Bluetti Low, schalte ab");
+    blue.switchOut("dc_output_on","off");
+  }
+ servo.write(stop);
+}
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) 
 {
     AwsFrameInfo *info = (AwsFrameInfo*)arg; 
@@ -436,16 +505,17 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
                 //          99 langsam links 
                 // 80 und 102  passen gefühlt gut zueinander
                 // 70 und 110 schneller
-                // 40 und 140 max speed 
+                // 40 und 140 max speed  langsamm drehen ist für die Steuerung sinnvoll
                 
                 //wsMsgSerial(buffer);
                 int val = 92;
                 if (!strcmp(doc["value"],"left")) 
-                   val = 110;  
+                   val = 99;  
                 else if (!strcmp(doc["value"],"right"))
-                   val = 70; 
+                   val = 85; 
                 
-                //servo.write(val);    
+                wsMsgSerial("turn Servo");
+                servo.write(val);    
           }
           else if (strcmp(doc["action"],"keepWebServerAlive")==0) 
           {
@@ -464,7 +534,36 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
           }
           else if (!strcmp(doc["action"],"relais"))
           {
-            schalteRelais( doc["value"]);
+            //schalteRelais( doc["value"]); soll nicht mehr unabhängig möglich sein 
+          }
+          else if (!strcmp(doc["action"],"adjustBluetti"))
+          {
+            adjustBluetti();
+          }
+          else if (!strcmp(doc["action"],"changeCharge"))
+          {
+            if ( !strcmp(doc["value"],"bluettiOnly"))
+            {
+              schalteRelais("bR3on"); //strange syntax has "historical" reasons :-) hatte erst Testaufbau
+              schalteRelais("bR2on");
+              schalteRelais("bR4on");
+              schalteRelais("bR1on");
+            }
+            else if ( !strcmp(doc["value"],"deyeOnly"))
+            {
+              schalteRelais("bR1off");
+              schalteRelais("bR2off");
+              schalteRelais("bR3off");
+              schalteRelais("bR4off");
+
+            }
+            else if ( !strcmp(doc["value"],"bluettiDeye"))
+            {
+              schalteRelais("bR1off");
+              schalteRelais("bR2off");
+              schalteRelais("bR3off");
+              schalteRelais("bR4on");
+            }
           }
         }
     }
@@ -506,6 +605,9 @@ void schalteRelais(const char * value) //muss const char * sein sonst meckert di
     sprintf(msg,"Write to pin %d mode is %d",pin,mode);
     wsMsgSerial(msg);
   }
+
+  delay(200); //zur sicherheit kleine Pause vor dem nächsten schalten - ob es das bringt, k.A.
+   //und damit ich die Schaltfolge sehe
 }
 
 
@@ -518,7 +620,7 @@ void setup() {
 
   //Servo Geschichte 
   const int frequency = 200; // Hz
-  //servo.attach(servoPin);
+  servo.attach(servoPin);
   /*
   servo.attach(
     servoPin, 
