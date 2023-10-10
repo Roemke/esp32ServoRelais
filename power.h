@@ -49,12 +49,13 @@ class Power {
         eHouse = eBlueInverter = eDeyeInverter = eBluetti = true;
         bluettiDCState = false; 
         house = blueInverter = deyeInverter = bluettiOut = bluettiIn = bluettiPercent = 0;
+        http.useHTTP10(true); //use old http1.0 - stream is not chunked
       }
       void getByWebApi();
       char *getJSON(const char *action);
     
     private:
-      const char * httpGet(char *fullRequest);
+      HTTPClient http; 
       //standard-Tasmotasteckdose
       void readTasmotaSteckdose(char *getString, int &power, bool &err);
            

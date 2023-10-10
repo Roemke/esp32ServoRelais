@@ -155,8 +155,8 @@ void bleNotifyCallback(const char * topic , String value)
   char msg[128];
   strcpy(msg,"in Callback, topic is");
   strcat(msg,topic);
-  #endif
   wsMsgSerial(msg);
+  #endif
   if (!strcmp(topic,"total_battery_percent"))
   {
     power.bluettiPercent = value.toInt();
@@ -596,8 +596,7 @@ void loop() {
     ws.cleanupClients(); // aeltesten client heraus werfen, wenn maximum Zahl von clients ueberschritten, 
                        // manchmal verabschieden sich clients wohl unsauber / gar nicht -> werden wir brutal
 
-    //power auslesen
-    wsMsgSerial("in loop try to read power");
+    //power auslesen    
     power.getByWebApi();
   }  
 
