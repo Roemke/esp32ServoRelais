@@ -100,4 +100,7 @@ bauen, ohne die Thematik wirklich zu verstehen.
 Nein, das stimmt so nicht, der connect funktioniert, den Write Request kann ich senden, offenbar liefert Bluetti Bluetooth dann
 eine Antwort - jedenfalls wenn man die 1.4.0 der Bibliothek verwendet, in der 1.4.1 wird mein Callback nicht aufgerufen. 
 
+Leider dauert es eine Zeit bis der Deye Inverter realisiert, dass er wieder Solar-Spannung hat
+so 5 - 10 Minuten scheinen normal zu sein eigentlich müsste das aber doch normal sein, wenn er morgens aufwacht.
+
 

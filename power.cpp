@@ -29,7 +29,7 @@ void Power::getByWebApi()
 
 
     
-void Power::readTasmotaSteckdose(char *getString, int &power, bool &err)
+void Power::readTasmotaSteckdose(const char *getString, int &power, bool &err)
 {
   http.begin(getString);
   http.GET();

@@ -23,7 +23,7 @@ class Power {
     bool bluettiDCState; 
 
     //Mittelwerte
-    /* das ist noch nicht durchdacht  
+    /* das ist noch nicht durchdacht, weiss nicht, ob ich das möchte  
     int mHouse;           
     int mBlueInverter; 
     int mDeyeInverter;    
@@ -57,7 +57,7 @@ class Power {
     private:
       HTTPClient http; 
       //standard-Tasmotasteckdose
-      void readTasmotaSteckdose(char *getString, int &power, bool &err);
+      void readTasmotaSteckdose(const char *getString, int &power, bool &err);
            
 };
 #endif

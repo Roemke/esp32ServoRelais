@@ -20,7 +20,6 @@ todo:
 #include <AsyncElegantOTA.h>//mist, der braucht den ESPAsyncWebServer, habe mal in der Bibliothek angepasst, so dasss es auch mit ESPAsyncWebSrv.h geht
                               //und wieder zurück, nehme den AsyncWebServer Bibliothek manuell installiert aus zip
 #include <ArduinoJson.h> //ArduinoJson hat ein anderes Speicherkonzept als Arduino_Json
-#include <PubSubClient.h> //mqtt
 #include <HTTPClient.h>
 
 #include <Servo.h>
@@ -78,8 +77,6 @@ bluetti_command_t bluettiCommand = {bluetti_polling_command,sizeof(bluetti_polli
 //#define myPASSWORD "passwort"
 const char * ssid = mySSID;
 const char *password = myPASSWORD;
-
-
  
 ObjectList <String> startmeldungen(16); //dient zum Puffern der Meldungen am Anfang
 
@@ -93,7 +90,10 @@ const int r1pin = 26;
 const int r2pin = 18;
 const int r3pin = 19;
 const int r4pin = 23;
-
+  
+long lastMsg = 0;
+long lastBluettiAdjust = 0;
+bool adjustBluettiFlag = false;
 
 AsyncWebServer server(80);
 //fuer den Websocket
@@ -102,22 +102,8 @@ unsigned long keepWebServerAlive = 0; //240000; //milliseconds also 4 Minuten, d
 //in dieser Zeit ein client connect -> der Server bleibt aktiv, 0 er bleibt aktiv, lohnt nicht, bringt bei 12 V nur 6mA gewinn
 unsigned long startTime;
 
-
-//ein wenig was zum OTA Update, nicht getestet, keine Ahnung, ob das mit dem Asynchronous Webserver funktioniert
-//nein, es geht nicht, es geht mit dem AsyncWebServer einfacher
-
 //---------------------------------------------
-//und fuer mqtt
-const char* mqttServer = mqttBROKER;
-const int mqttPort = 1883;
-long lastMsg = 0;
 WiFiClient wifiClient; //nicht ganz klar - ein Client der die Verbindung nutzen kann
-PubSubClient mqttClient(wifiClient); 
-
-//mqtt funktioniert so weit erstmal, kann ich das auf http-Client umstellen + Bluetooth - ich kann ja eigentlich
-//alle Werte sinnvoll über http abfragen, es sind alles tasmota teile, dann bin ich nicht auf mqtt angewiesen 
-//mqtt auf tasmota aktualisiert nur alle 10 Sekunden mache mal einen branch mqtt - der ist nicht fertig, wenn http geht
-//wird er auch nicht weiter entwickelt :-)
 
 //--------------------websocket kram 
 void wsMessage(const char *message,AsyncWebSocketClient * client = 0)
@@ -148,7 +134,7 @@ void informClients()
   char *json =  power.getJSON("power");
   ws.textAll(json);
 }
-//alle daten, die am Anfang gebraucht werden 
+//alle daten, die am Anfang gesendet werden
 void sendAvailableData(AsyncWebSocketClient * client, AsyncWebSocket *server)
 {
    //sende die Daten an den Client
@@ -157,6 +143,8 @@ void sendAvailableData(AsyncWebSocketClient * client, AsyncWebSocket *server)
    wsMsgSerial(msg.c_str());
    msg = String("Anzahl Clients: ") + server->count();
    wsMsgSerial(msg.c_str());
+   char * json = power.getJSON("power");
+   ws.textAll(json);
 }
 
 //bluetti fertig stellen
@@ -199,152 +187,21 @@ void bleNotifyCallback(const char * topic , String value)
   #endif
 }
 
-Bluetti blue("AC200M2308002058882",bluettiCommand,bleNotifyCallback); //die bluetoothid, das command fuer das modell und der Callback 
+Bluetti blue((char *) "AC200M2308002058882",bluettiCommand,bleNotifyCallback); //die bluetoothid, das command fuer das modell und der Callback 
 
 
-
-void mqttCallback(char* topic, byte* message, unsigned int length) {
-  //folgendes spaeter raus, ist viel
-  /*
-   * Serial.print("Message arrived on topic: ");
-  Serial.println(topic);
-  Serial.print("Message: ");
-  
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)message[i]);
-  }
-  Serial.println();
-  */
-
-  // If a message is received on the topic esp32/output, you check if the message is either "on" or "off". 
-  // Changes the output state according to the message
-  if (strcmp(topic,"tele/DVES_352360/SENSOR")==0) //Strom-Messgerät liefert JSON-Format
-  {
-    //interessant: https://arduinojson.org/v6/assistant/#/step1 - gibt 96 fuer meinen String an und bei i(nformation) meine unten überlegte capacity
-    //danach gibt er noch quelltext - nett 
-    //{"Time":"2023-08-26T11:10:53","Power":{"Meter_Number":"0a014954520003504c4c","Total_in":3460.0965,"Power_curr":1710,"Total_out":62.0456}}
-    /*wandle nicht um, sondern sende die Nachricht einfach komplett 
-    const int capacity = JSON_OBJECT_SIZE(2)+JSON_OBJECT_SIZE(4);
-    //ein json-objekt mit 2 membern, eines der member ist ein object mit 4 membern
-    StaticJsonDocument<capacity> doc; 
-    DeserializationError error = deserializeJson(doc, message, length);
-    if (error) {
-      Serial.print("deserializeJson() failed: ");
-      Serial.println(error.c_str());
-      return;
-    }    
-    const char* Time = doc["Time"]; // "2023-08-26T11:10:43"
-    JsonObject Power = doc["Power"];
-    const char* Power_Meter_Number = Power["Meter_Number"]; // "0a014954520003504c4c"
-    //float Power_Total_in = Power["Total_in"]; // 3460.092
-    //int Power_Power_curr = Power["Power_curr"]; // 1702
-    //char powerString[] = "{\"action\":\"powerHouse\",\"power\":\"xxxxxxxxxxxxxxxxx\"}" );
-    sprintf(powerString "{\"action\":\"powerHouse\",\"power\":\"%d\"}",Power["Power_curr"] );
-    float Power_Total_out = Power["Total_out"]; // 62.0456
-    */
-    const char * begin = "{\"action\":\"powerHouse\",\"data\":";
-    const char * end = "}";
-    char * str = new char[length+strlen(begin)+strlen(end)+24];//Puffer +24 statt +1 :-)
-    strcpy(str,begin);
-    int start = strlen(str);
-    //strcat(str,(char *)message); message ist nicht null-terminated
-    for (int i = 0; i < length; i++) 
-      str[start++] = (char) message[i];
-    str[start]=0;
-    strcat(str,end);
-    //Serial.print("Sende ");
-    //Serial.println(str);
-    //ws.textAll(str);
-    
-    delete [] str;          
-  }
-  else if (strcmp(topic,"tele/DVES_17B73E/SENSOR")==0)//tasmota bluetti inverter
-  { //das ist doch alles murcks, obwohl ich mit telePeriod 10 in der console von tasmota den wert angepasst habe 
-    //und tasmota laut log in der console alle 10s sendet, bekomme ich hier nicht bescheid
-    //auch fhem sendet angeblich regelmäßig mqtt2 traffic ist vorhanden im log - fehler an buffer-size, die war bei mqtt2 zu klein (hier)
-    const char * begin = "{\"action\":\"powerBluettiInverter\",\"data\":";
-    const char * end = "}";
-    char * str = new char[length+strlen(begin)+strlen(end)+24];//Puffer +24 statt +1 :-)
-    strcpy(str,begin);
-    int start = strlen(str);
-    //strcat(str,(char *)message); message ist nicht null-terminated
-    for (int i = 0; i < length; i++) 
-      str[start++] = (char) message[i];
-    str[start]=0;
-    strcat(str,end);
-    //Serial.print("Sende ");
-    //Serial.println(str);
-    //ws.textAll(str);
-    
-    delete [] str;              
-  }
-  else if (strcmp(topic,"tele/DVES_183607/SENSOR")==0)
-  {
-    const char * begin = "{\"action\":\"powerSolarDeye\",\"data\":";
-    const char * end = "}";
-    char * str = new char[length+strlen(begin)+strlen(end)+24];//Puffer +24 statt +1 :-)
-    strcpy(str,begin);
-    int start = strlen(str);
-    //strcat(str,(char *)message); message ist nicht null-terminated
-    for (int i = 0; i < length; i++) 
-      str[start++] = (char) message[i];
-    str[start]=0;
-    strcat(str,end);
-    //Serial.print("Sende ");
-    //Serial.println(str);
-    //ws.textAll(str);
-    
-    delete [] str;                  
-  }
-}
-
-void reconnect() {
-  // Loop until we're reconnected
-  while (!mqttClient.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    // Attempt to connect
-    if (mqttClient.connect("ESP32Solar")) {
-      Serial.println("connected");
-      // Subscribe
-      mqttClient.subscribe("tele/DVES_17B73E/SENSOR");
-      mqttClient.subscribe("tele/DVES_352360/SENSOR");//power haus ist tasmota, das kann ich so abgreifen
-      mqttClient.subscribe("tele/DVES_9C2197/SENSOR");//alles andere an tasmota devices geht nicht, seltsam buffer problem
-      mqttClient.subscribe("tele/DVES_183607/SENSOR");
-      
-      /*
-       * Hmm, unter http://192.168.0.203:8083/fhem?detail=MQTT2_ESP32Solar und dann subscriptions ist auch nur das erste 
-       */
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(mqttClient.state());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
-    }
-  }
-}
-void setupMQTT() 
-{
-  mqttClient.setBufferSize(1024);
-  mqttClient.setServer(mqttServer, mqttPort);
-  // set the callback function
-  mqttClient.setCallback(mqttCallback);
-}
 
 
 //------------------------------------------
-//viele Funktionen anonym, bzw. als Lambda Ausdruck, hier der Rest zum Server-Kram
+//404 message
 void notFound(AsyncWebServerRequest *request) {
     request->send(404, "text/plain", "Not found - ich kann das nicht");
 }
 
+//aufruf auf / wird durch den prozessor gesendet, hier wenig einzutragen, man könnnte die Power werte setzen, 
+//die werden aber auch durch den websocket gesendet
 String processor(const String& var)
 {
-  /*if(var == "NEW_RFID_LINES")
-  {
-    String lines = rfidsNew.htmlLines("add");
-    return lines;
-  }*/
   String result = "";
  
   if (var == "UPDATE_LINK")
@@ -355,12 +212,11 @@ String processor(const String& var)
 }
 
 
-
 //bei einem connect muesste ich doch eigentlich die notwendigen Daten an den speziellen client 
 //senden koennen. Ich war ein wenig in der "Ajax-Denke" gefangen - da hat der Client die Daten 
 //abgerufen, das ist hier aber unnoetig und fuehrt zu weiteren get-Geschichten im behandeln 
 //der events. 
-void onWSEvent(AsyncWebSocket       *server,  //
+void onWSEvent(AsyncWebSocket     *server,  //
              AsyncWebSocketClient *client,  //
              AwsEventType          type,    // the signature of this function is defined
              void                 *arg,     // by the `AwsEventHandler` interface
@@ -386,50 +242,57 @@ void onWSEvent(AsyncWebSocket       *server,  //
             break;
      }
 }
+ 
 
+//folgendes funktioniert noch nicht, ich denke, hier sind zu viele delays eingebaut, habe in Erinnerung, dass dies aus asynchromem 
+//aufruf heraus nicht funktioniert, werde daher nur ein Flag setzen und diese hier aus der main loop aufrufen
+//noch nicht drin: Umschaltung zwichen Bluetti laden, Deye vollständig und beide halb und halb
 void adjustBluetti()
 {
-   const int stop = 92;
-  
-  int dir=stop;
+  const int stop = 92;
+  const int left = 105; //erhöhen Leistung bluetti an Haus
+  const int right = 79; //erniedrigen "
 
+  int dir=stop;
   wsMsgSerial("Adjust Bluetti");
   if (!power.eBluetti && power.bluettiPercent > 10)
   {
+    wsMsgSerial("Bluetti hat mehr als 10 %");
     if (power.house > 0)
     {
-      blue.switchOut("dc_output_on","on");
-      wsMsgSerial("Hausverbrauch > 0, passe an");
+      wsMsgSerial("Hausverbrauch > 0, schalte Bluetti an");
+      blue.switchOut((char *) "dc_output_on",(char *) "on");
       delay (1000);
       power.getByWebApi();
     }
     if (power.house > 0)
     { //bluetti erhöhen so möglich
-      while  (power.house > 5 && power.bluettiPercent > 10 && !power.eBluetti && power.blueInverter < 150)
+      dir = left;
+      servo.write(dir);
+      while  (power.house > 15 && power.bluettiPercent > 10 && !power.eBluetti && power.blueInverter < 150)
       {
-        dir = 85;
-        servo.write(dir);
-        delay(500);
-        servo.write(stop);      
+        wsMsgSerial("Hausverbrauch > 0, in Schleife zum erhöhen Bluetti out ");
+        delay(10);
         power.getByWebApi();
-        delay(500);
+        informClients();
+        delay(20);
       }
     } 
     else if (power.house < 0)
     {
       wsMsgSerial("Hausverbrauch <0, passe an");
-      while  (power.house < 5 && power.blueInverter>38) //kleiner als 34 klappt nicht 
+      dir = right;        
+      servo.write(dir);
+      while  (power.house < 15 && power.blueInverter>38) //kleiner als 34 klappt nicht 
       {
-        dir = 99;
-        servo.write(dir);
-        delay(500);
-        servo.write(stop);      
+        wsMsgSerial("Hausverbrauch < 5, Schleife zum erniedrigen Bluetti out ");
         power.getByWebApi();
-        delay(500);
+        informClients();
+        delay(20);
       }  
       if (power.house < -5)
       {
-        blue.switchOut("dc_output_on","off");
+        blue.switchOut((char *) "dc_output_on",(char *) "off");
         wsMsgSerial("Verbrauch < -5 schalte Blue aus");
       }
     }
@@ -437,138 +300,142 @@ void adjustBluetti()
   else 
   {
     wsMsgSerial("Bluetti Low, schalte ab");
-    blue.switchOut("dc_output_on","off");
+    blue.switchOut((char *) "dc_output_on",(char *) "off");
   }
  servo.write(stop);
+ adjustBluettiFlag = false; //und abschalten 
+ ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluettiDone\"}");
 }
+
+//nachricht vom client
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) 
 {
-    AwsFrameInfo *info = (AwsFrameInfo*)arg; 
-    if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) 
+  AwsFrameInfo *info = (AwsFrameInfo*)arg; 
+  char confirmMessage[256]="{\"action\":\"confirm\",\"topic\":\"";
+  int confirmLength = strlen(confirmMessage);
+  char confirmEnd[] = "\"}";
+  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) 
+  {
+    data[len] = 0; //sollte ein json object als String sein        
+    char *cData = (char *)data;
+    //String s = cData; //legt eine Kopie an
+    String message;
+    const int capacity = JSON_OBJECT_SIZE(3)+2*JSON_OBJECT_SIZE(3);//+JSON_ARRAY_SIZE(RFID_MAX); //
+    
+    StaticJsonDocument<capacity> doc; //hinweis: doc nur einmal verwenden 
+    Serial.println("we have in WebSocketMessage: ");
+    Serial.println(cData);
+    
+    DeserializationError err = deserializeJson(doc, cData); //damit veraendert das JSON-Objekt den Speicher cData
+    if (err) //faengt auch Probleme beim Speicherplatz ab. 
     {
-        data[len] = 0; //sollte ein json object als String sein        
-        char *cData = (char *)data;
-        //String s = cData; //legt eine Kopie an
-        String message;
-        const int capacity = JSON_OBJECT_SIZE(3)+2*JSON_OBJECT_SIZE(3);//+JSON_ARRAY_SIZE(RFID_MAX); //
-        
-        StaticJsonDocument<capacity> doc; //hinweis: doc nur einmal verwenden 
-        Serial.println("we have in WebSocketMessage: ");
-        Serial.println(cData);
-        
-        DeserializationError err = deserializeJson(doc, cData); //damit veraendert das JSON-Objekt den Speicher cData
-        if (err) //faengt auch Probleme beim Speicherplatz ab. 
-        {
-          Serial.print(F("deserializeJson() failed with code "));
-          Serial.println(err.f_str());
-          ws.textAll("Fehler beim Derialisieren");//erhalte die Nachricht, javascript hat dann natuerlich einen json-error, das ist ok, dann sieht man es :-)
-          ws.textAll(err.f_str());
-        }
-        else
-        {
-          if(strcmp(doc["action"],"clearNew") == 0)
+      Serial.print(F("deserializeJson() failed with code "));
+      Serial.println(err.f_str());
+      wsMsgSerial("Fehler beim Derialisieren");//erhalte die Nachricht, javascript hat dann natuerlich einen json-error, das ist ok, dann sieht man es :-)
+    }
+    else
+    {
+      /*
+      if(strcmp(doc["action"],"clearNew") == 0) //:-) gibts gar nicht mehr 
+      {
+        //rfidsNew.clear();
+        strcat(confirmMessage,"clearNew");
+        ws.textAll("{\"action\":\"clearNew\"}");
+        wsMsgSerial("Neu gelesene geloescht");
+      }*/
+      if (strcmp(doc["action"],"dc_output") ==0)
+      {
+          //String state =  (const char *) doc["value"];
+          if ( !strcmp((const char *) doc["value"],"toggle") )
           {
-            //rfidsNew.clear();
-            ws.textAll("{\"action\":\"clearNew\"}");
-            wsMsgSerial("Neu gelesene geloescht");
-          }
-          else if (strcmp(doc["action"],"dc_output_on") ==0)
-          {
-              //String state =  (const char *) doc["value"];
-              if ( !strcmp((const char *) doc["value"],"toggle") )
+              if(power.bluettiDCState)
               {
-                  if(power.bluettiDCState)
-                    blue.switchOut("dc_output_on","off");
-                  else 
-                    blue.switchOut("dc_output_on","on");
+                blue.switchOut((char *) "dc_output_on",(char*) "off");
               }
               else
-                blue.switchOut("dc_output_on", (const char *) doc["value"]);  
-              //info an angeschlossene devices / smartphone muesste ueber bluetti(bluetooth)->dieser esp(websocket)-> angeschlosse devices laufen
+              { 
+                blue.switchOut((char *) "dc_output_on", (char *) "on");
+              }
           }
-          else if ( strcmp(doc["action"],"servo")==0)
+          else
           {
-              //steuere mal den Servo an   
-                //lese Wert von Serial
-                //wsMsgSerial("Warte auf eingabe");
-                //while (Serial.available()==0){}             // wait for user input
-                //int val = Serial.parseInt();                    //Read user input and hold it in a variable
-                //char buffer[64] = "";
-                //sprintf(buffer,"Habe Wert %d gelesen", val);
-              
-                //mein servo 98:  langsam links  97 er ruckelt
-                //87 ruckelnd links oder nichts 
-                //86 langsam rechts bei 30-40 ist er schon bei max speed rechts ich denke die Bibliothek ist halt fuer normale Servos gedacht:-)
-                /* die spezielle biblio bringt aber auch nichts, da sie einen parallax feedback sensor erwartet, der konstet sehr viel + viel versand */
-                //geeignet: 85 langsam rechts
-                //          92 stop 
-                //          99 langsam links 
-                // 80 und 102  passen gefühlt gut zueinander
-                // 70 und 110 schneller
-                // 40 und 140 max speed  langsamm drehen ist für die Steuerung sinnvoll
-                
-                //wsMsgSerial(buffer);
-                int val = 92;
-                if (!strcmp(doc["value"],"left")) 
-                   val = 99;  
-                else if (!strcmp(doc["value"],"right"))
-                   val = 85; 
-                
-                wsMsgSerial("turn Servo");
-                servo.write(val);    
+            blue.switchOut((char *) "dc_output_on", (const char *) doc["value"]);
+            if (!strcmp((const char * )doc["value"],"on"))
+              strcat(confirmMessage,"bluettiDCOn");
+            else 
+              strcat(confirmMessage,"bluettiDCOff");
           }
-          else if (strcmp(doc["action"],"keepWebServerAlive")==0) 
-          {
-            startTime = millis();
-            keepWebServerAlive = (unsigned long ) doc["time"]; //0 fuer ewig
-            Serial.print("Zeit : ");
-            Serial.println((unsigned long ) doc["time"]);
-            String msg("Zeit bis zum Stopp des Webservers: ");
-            msg += keepWebServerAlive; 
-            wsMsgSerial(msg.c_str());
-          }
-          else if (strcmp(doc["action"],"rebootESP")==0)
-          {
-            wsMsgSerial("Restart of ESP");
-            ESP.restart();
-          }
-          else if (!strcmp(doc["action"],"relais"))
-          {
-            //schalteRelais( doc["value"]); soll nicht mehr unabhängig möglich sein 
-          }
-          else if (!strcmp(doc["action"],"adjustBluetti"))
-          {
-            adjustBluetti();
-          }
-          else if (!strcmp(doc["action"],"changeCharge"))
-          {
-            if ( !strcmp(doc["value"],"bluettiOnly"))
+          //info an angeschlossene devices / smartphone muesste ueber bluetti(bluetooth)->dieser esp(websocket)-> angeschlosse devices laufen
+      }
+      else if ( strcmp(doc["action"],"servo")==0)
+      {
+            //wsMsgSerial(buffer);
+            int val = 92;
+            if (!strcmp(doc["value"],"left"))
+            { 
+              val = 99;
+              strcat(confirmMessage,"servoLeft");
+            }  
+            else if (!strcmp(doc["value"],"right"))
             {
-              schalteRelais("bR3on"); //strange syntax has "historical" reasons :-) hatte erst Testaufbau
-              schalteRelais("bR2on");
-              schalteRelais("bR4on");
-              schalteRelais("bR1on");
+              val = 85; 
+              strcat(confirmMessage,"servoRight");
             }
-            else if ( !strcmp(doc["value"],"deyeOnly"))
-            {
-              schalteRelais("bR1off");
-              schalteRelais("bR2off");
-              schalteRelais("bR3off");
-              schalteRelais("bR4off");
-
-            }
-            else if ( !strcmp(doc["value"],"bluettiDeye"))
-            {
-              schalteRelais("bR1off");
-              schalteRelais("bR2off");
-              schalteRelais("bR3off");
-              schalteRelais("bR4on");
-            }
-          }
+            else
+              strcat(confirmMessage,"servoStop");
+            servo.write(val);    
+            wsMsgSerial("turn Servo");
+      }
+      else if (strcmp(doc["action"],"rebootESP")==0)
+      {
+        wsMsgSerial("Restart of ESP");
+        strcat(confirmMessage,"rebootESP");
+        ESP.restart();
+      }
+      else if (!strcmp(doc["action"],"relais"))
+      { //nicht mehr unabhängig schalten
+        //schalteRelais( doc["value"]); //soll nicht mehr unabhängig möglich sein 
+      }
+      else if (!strcmp(doc["action"],"adjustBluetti"))
+      {
+        strcat(confirmMessage,"adjustBluetti");
+        adjustBluettiFlag = true; //hier flag setzen statt aufzurufen
+      }
+      else if (!strcmp(doc["action"],"changeCharge"))
+      {
+        if ( !strcmp(doc["value"],"bluettiOnly"))
+        {
+          schalteRelais("bR3on"); //strange syntax has "historical" reasons :-) hatte erst Testaufbau
+          schalteRelais("bR2on");
+          schalteRelais("bR4on");
+          schalteRelais("bR1on");
+          strcat(confirmMessage,"bluettiOnly");
         }
+        else if ( !strcmp(doc["value"],"deyeOnly"))
+        {
+          schalteRelais("bR1off");
+          schalteRelais("bR2off");
+          schalteRelais("bR3off");
+          schalteRelais("bR4off");
+          strcat(confirmMessage,"deyeOnly");
+        }
+        else if ( !strcmp(doc["value"],"bluettiDeye"))
+        {
+          schalteRelais("bR1off");
+          schalteRelais("bR2off");
+          schalteRelais("bR3off");
+          schalteRelais("bR4on");
+          strcat(confirmMessage,"bluettiDeye");
+        }
+      }
     }
+    if (strlen(confirmMessage)!=confirmLength)
+    {
+      strcat(confirmMessage,confirmEnd);
+      ws.textAll(confirmMessage);
+    }
+  }
 }
-
 
 //--------------------------------------------------------------
 void schalteRelais(const char * value) //muss const char * sein sonst meckert die JSON-Bibliothek
@@ -618,19 +485,7 @@ void setup() {
   //beginn der seriellen Kommunikation mit 115200 Baud
   Serial.begin(115200);
 
-  //Servo Geschichte 
-  const int frequency = 200; // Hz
   servo.attach(servoPin);
-  /*
-  servo.attach(
-    servoPin, 
-    Servo::CHANNEL_NOT_ATTACHED, 
-    Servo::DEFAULT_MIN_ANGLE, 
-    Servo::DEFAULT_MAX_ANGLE, 
-    Servo::DEFAULT_MIN_PULSE_WIDTH_US, 
-    Servo::DEFAULT_MAX_PULSE_WIDTH_US, 
-    frequency);
- */
   //pins setzen 
   pinMode(r1pin ,OUTPUT); 
   pinMode(r2pin ,OUTPUT);
@@ -658,9 +513,7 @@ void setup() {
     startmeldungen.add(msg.c_str());
   }
 
-  //mqtt aufsetzen 
-  setupMQTT();
-
+  
   //bluetti bluetooth
   blue.initBluetooth();
   
@@ -676,7 +529,7 @@ void setup() {
   //normale Anfrage
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
   {
-    request->send_P(200, "text/html", index_html, processor);      
+    request->send_P(200, "text/html", index_html, processor); //durch processor filtern     
   });
   ws.onEvent(onWSEvent);
   server.addHandler(&ws); //WebSocket dazu 
@@ -697,26 +550,32 @@ void loop() {
   {
     ws.cleanupClients(); // aeltesten client heraus werfen, wenn maximum Zahl von clients ueberschritten, 
                        // manchmal verabschieden sich clients wohl unsauber / gar nicht -> werden wir brutal
-
     //power auslesen    
-    power.getByWebApi();
   }  
 
-  if (!mqttClient.connected()) {
-    reconnect();
-  }
-  mqttClient.loop();
   blue.handleBluetooth();
-  //send information to mqtt --------------------------------------------------
   long now = millis();
   int del = now - lastMsg;
-  if (del > 5000) //alle 5 Sekunden 
+  if (del > 2000) //alle 2 Sekunden Information heraus 
   {
     lastMsg = now;
-    mqttClient.publish("esp32solar/state","online");
+    power.getByWebApi();
     informClients(); //
     //Serial.println("try to publish esp32solar/state online");
-  }  
-  delay(2000);
+    //ein paar checks 
+    if (power.house < -10)
+    {
+      adjustBluettiFlag = true;
+      ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluetti\"}");
+    }
+    if (power.bluettiPercent <=10 && !power.eBluetti)
+    { //auf nummer sicher gehen
+      wsMsgSerial("Bluetti Low, schalte ab");
+      blue.switchOut((char *) "dc_output_on",(char *) "off");
+    }  
+  } 
+ 
+  if (adjustBluettiFlag)
+    adjustBluetti();
   //---------------------------------------------------------------------------
 }
