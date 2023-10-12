@@ -17,6 +17,9 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       input:nth-of-type(2){
         width: 25em;
       }
+      table td {
+        margin-left: 3em;
+      }
       
       #divNachrichten {
         border: 1px solid blue;
@@ -49,7 +52,33 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       }
       #dInfo{
         background: rgba(252, 252, 252, 0.95);
+        display: grid;
+        gap: 		0.5em  2em; /* row column */ 
+        grid-template-columns: auto auto;   
+        justify-content: start;     
       }
+      #dInfo h2 {
+      	 grid-column: 1 / span 2;
+      }
+      #dManuell {
+        display: grid;
+        gap: 		0.5em  2em; /* row column */ 
+        grid-template-columns: auto auto auto;   
+        justify-content: start;     
+      }
+      #dManuell * {
+      	margin-top: 0em;
+      	margin-bottom: 0em; 
+      }
+      #dManuell p,h2 {
+      	grid-column: 1 / span 3;
+      	margin-top: 0.5em;
+      	margin-bottom: 0.5em;
+      }
+      #dManuell .oneLine{
+      	grid-column: 1 / span 3;
+      }
+      
       #controlContainer { /* hmm ein grid ist etwas übertrieben */
           display: grid;
           background-color: #fafaff;
@@ -81,17 +110,18 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       	margin: 4px;
       	background-color: #eee;
       	padding: 4px;
+      	min-width: 5em;
       }
-      button.oneTouch {
+      .oneTouch {
       	background-color : #dfd;
       }
-      button.confirmedTouch {
+      .confirmedTouch {
       	background-color: #0a0;
       }
     </style>
     <script>
       let gateway = `ws://${window.location.hostname}/ws`;
-      //gateway = "ws://192.168.0.240/ws"; //zum testen 
+      gateway = "ws://192.168.0.240/ws"; //zum testen 
       var websocket;
       let bluettiOn = false;
       function htmlToElement(html) 
@@ -119,9 +149,9 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
          }
          websocket.onmessage = (e) =>
          {
-            console.log(`Received a notification from ${e.origin}`);
+            //console.log(`Received a notification from ${e.origin}`);
             console.log(e);
-            console.log(e.data);
+            //console.log(e.data);
             let data =JSON.parse(e.data);
             //console.log(data);
             let now = new Date();
@@ -243,15 +273,15 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         {
            websocket.send(JSON.stringify({'action':'servo','value':'stop'}));
         });
-        document.getElementById('bBlueDCOn').addEventListener("click",() => 
-        { 
+        document.getElementById('bBlueDCOn').addEventListener("click",(e) => 
+        {
             websocket.send(JSON.stringify({'action':'dc_output','value':'on'}));
         });
-        document.getElementById('bBlueDCOff').addEventListener("click",() => 
-        { 
+        document.getElementById('bBlueDCOff').addEventListener("click",(e) => 
+        {
             websocket.send(JSON.stringify({'action':'dc_output','value':'off'}));
-        });
-        //anpassen der Leistung von Bluetti ins Hausnetz
+				});        
+				//anpassen der Leistung von Bluetti ins Hausnetz
         document.getElementById('bAdjustBluetti').addEventListener("click",() => 
         { 
             websocket.send(JSON.stringify({'action':'adjustBluetti','value':''}));
@@ -294,8 +324,8 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
            });
         }); */ 
       }); 
-    </script>
-  </head>  
+  </script>
+  </head>
   <body style='font-family:Helvetica, sans-serif'>
     <div id="dSticky"> 
       <div id='controlContainer'>
@@ -304,44 +334,40 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       </div>
       <div class="framed" id="dInfo">
         <h2>Information <span id="dateTime">?</span></h2>
-        <table>
-          <tr>
-            <td>P. Haus</td><td><span id="valPowerHouse">?</span></td>
-          </tr>
-          <tr>
-            <td>Blue State</td><td><span id="valBluettiPercent">?</span></td>
-          </tr>
-          <tr>
-            <td>Blue Solar</td><td><span id="valSolarBluePower">?</span></td>
-          </tr>
-          <tr>
-            <td>Blue P</td><td><span id="valBluePower">? </span></td>
-          </tr>
-          <tr>
-            <td>             </td><td><span id="valBlueInvPower">?</span></td>
-          </tr>
-          <tr>
-            <td>Deye Solar</td><td><span id="valSolarDeyePower">?</span></td>
-          </tr>
-        </table>
+        <!-- neue Zeile -->
+        <div>P. Haus: <span id="valPowerHouse">?</span></div>
+        <div>Deye Solar: <span id="valSolarDeyePower">?</span></div>
+        <!-- neue Zeile -->
+        <div>Blue State: <span id="valBluettiPercent">?</span></div>
+        <div>Blue Solar: <span id="valSolarBluePower">?</span></div>
+        <!-- neue Zeile -->
+        <div>Blue P: <span id="valBluePower">? </span></div>
+        <div id="valBlueInvPower">?</div>
       </div>
     </div>
-  <div class="framed">
+  <div class="framed" id = "dManuell">
     <h2> manuelle Schalter und Information</h2>
-    <div>
-          <button id="bAdjustBluetti"  type="button">BluettiOut anpassen</button>
-          <button id="bBluettiOnly"  type="button">Bluetti voll laden</button>
-          <button id="bDeyeOnly"  type="button">nur Haus versorgen (Deye)</button>
-          <button id="bBluettiDeye"  type="button">Haus versorgen, Bluetti laden</button>
-    </div>
-    <div>
-		  <p>Die folgenden Buttons sollten nicht mehr / selten notwendig sein </p>
-		    <button id="bBlueDCOn"   type="button">Bluetti DC Einspeisung ein</button> <!-- immer noch (2023-09) ein Button sendet ab außer er ist type button -->
-		    <button id="bBlueDCOff"   type="button">Bluetti DC Einspeisung aus</button> <!-- immer noch (2023-09) ein Button sendet ab außer er ist type button -->
-		    <!------- Servo testen -->
-		    <button id="bServoLeft"  type="button">Servo Left/Bluetti erhöhen</button> <!-- immer noch (2023-09) ein Button sendet ab außer er ist type button -->
-		    <button id="bServoRight" type="button">Servo Right/Bluetti verringern</button> <!-- immer noch (2023-09) ein Button sendet ab außer er ist type button -->
-		    <button id="bServoStop"  type="button">Servo Stop</button> <!-- immer noch (2023-09) ein Button sendet ab außer er ist type button -->
+    <p>Welche Art des Ladens, 3 Möglichkeiten </p>
+    <div><button id="bBluettiOnly"  type="button" >nur Bluetti</button></div>
+    <div><button id="bDeyeOnly"     type="button" >nur Haus/Deye</button></div>
+    <div><button id="bBluettiDeye"  type="button" >beide </button></div>
+		<div>Automatische Wahl des Ladens (noch ohne Funktion)</div>
+		<div><button type="button" id="bAutoChargeOn"  >an </button></div>
+		<div><button type="button" id="bAutoChargeOff"  >aus </button></div>
+    <p>Leistung der Bluetti und  Hausverbrauch: <button id="bAdjustBluetti"  type="button">BluettiOut anpassen</button> </p>
+		<div>Automatisches Anpassen der Leistung der Bluetti (noch ohne Funktion) </div>
+		<div><button type="button" id="bAutoAdjustOn"  >an </button></div>
+		<div><button type="button" id="bAutoAdjustOff"  >aus </button></div>
+    
+		<p>Die folgenden Buttons sollten nicht / nur selten notwendig sein </p>
+		<div>Bluetti DC Einspeisung</div>
+		<div><button type="button" id="bBlueDCOn"  >an </button></div>
+		<div><button type="button" id="bBlueDCOff"  >aus </button></div>
+		<!------- Servo (testen) -->
+		<p> Servo steuern (links / rechts / stop), die Einspeisung durch Bluetti ändern oder Änderung stoppen  </p>
+		<div><button type="button"  id="bServoLeft"> erhöhen</button></div>
+		<div><button type="button"  id="bServoRight"> verringern</button></div>
+		<div><button type="button"  id="bServoStop"> Stop</button></div>
     </div>
     <!-- relais dürfen nicht mehr unabhängig geschaltet werden 
     <form id="fRelais">
@@ -354,7 +380,6 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       <button id="bR4on"   type="button">R4 on</button>
       <button id="bR4off"  type="button">R4 off</button> 
     </form> -->
-    </div>
     <div class="framed">
     <h2>Erl&auml;uterungen</h2>
     <p>Zeigt den Zustand der Solar-Geschichten an und ermöglicht teilweise das Schalten. </p>

@@ -86,14 +86,18 @@ Servo servo;
 static const int servoPin = 15;//ist io15 = tdo
 
 //und die Relais
-const int r1pin = 26; 
+const int r1pin = 26;  
 const int r2pin = 18;
 const int r3pin = 19;
 const int r4pin = 23;
+
+enum class ServoStatus {Left,Right,Stop} servoStatus;
+enum class LadeStatus  {DeyeOnly,BluettiOnly,BluettiDeye} ladeStatus;
   
 long lastMsg = 0;
 long lastBluettiAdjust = 0;
 bool adjustBluettiFlag = false;
+bool adjustBluettiFinished = false; // noch nicht im Einsatz 
 
 AsyncWebServer server(80);
 //fuer den Websocket
@@ -133,6 +137,28 @@ void informClients()
 {
   char *json =  power.getJSON("power");
   ws.textAll(json);
+
+  //und statusmeldungen als confirm senden
+  if (ladeStatus == LadeStatus::BluettiDeye)
+    ws.textAll("{\"action\":\"confirm\",\"topic\":\"bluettiDeye\"}");
+  else if ( ladeStatus == LadeStatus::BluettiOnly )
+    ws.textAll("{\"action\":\"confirm\",\"topic\":\"bluettiOnly\"}");
+  else if ( ladeStatus == LadeStatus::DeyeOnly )
+    ws.textAll("{\"action\":\"confirm\",\"topic\":\"deyeOnly\"}");
+
+  if (power.bluettiOut)  
+    ws.textAll("{\"action\":\"confirm\",\"topic\":\"bluettiDCOn\"}");
+  else
+    ws.textAll("{\"action\":\"confirm\",\"topic\":\"bluettiDCOff\"}");
+
+  if (servoStatus == ServoStatus::Left)
+    ws.textAll("{\"action\":\"confirm\",\"topic\":\"servoStop\"}"); 
+  else if (servoStatus == ServoStatus::Right)
+    ws.textAll("{\"action\":\"confirm\",\"topic\":\"servoRight\"}"); 
+  else if (servoStatus == ServoStatus::Stop)
+    ws.textAll("{\"action\":\"confirm\",\"topic\":\"servoStop\"}"); 
+
+
 }
 //alle daten, die am Anfang gesendet werden
 void sendAvailableData(AsyncWebSocketClient * client, AsyncWebSocket *server)
@@ -243,7 +269,46 @@ void onWSEvent(AsyncWebSocket     *server,  //
      }
 }
  
+//schalten, die confirmMessage wird gesendet
+void schalteLaden(const char * dest)
+{
+  char confirmMessage[256]="{\"action\":\"confirm\",\"topic\":\"";
+  int confirmLength = strlen(confirmMessage);
+  char confirmEnd[] = "\"}";
 
+  if ( !strcmp(dest,"bluettiOnly"))
+  {
+    schalteRelais("bR3on"); //strange syntax has "historical" reasons :-) hatte erst Testaufbau
+    schalteRelais("bR2on");
+    schalteRelais("bR4on");
+    schalteRelais("bR1on");
+    ladeStatus = LadeStatus::BluettiOnly;
+    strcat(confirmMessage,"bluettiOnly");
+  }
+  else if ( !strcmp(dest,"deyeOnly"))
+  {
+    schalteRelais("bR1off");
+    schalteRelais("bR2off");
+    schalteRelais("bR3off");
+    schalteRelais("bR4off");
+    ladeStatus = LadeStatus::DeyeOnly;
+    strcat(confirmMessage,"deyeOnly");
+  }
+  else if ( !strcmp(dest,"bluettiDeye"))
+  {
+    schalteRelais("bR1off");
+    schalteRelais("bR2off");
+    schalteRelais("bR3off");
+    schalteRelais("bR4on");
+    ladeStatus = LadeStatus::BluettiDeye;
+    strcat(confirmMessage,"bluettiDeye");
+  }
+  if (strlen(confirmMessage)!=confirmLength)
+  {
+    strcat(confirmMessage,confirmEnd);
+    ws.textAll(confirmMessage);
+  }
+}
 //folgendes funktioniert noch nicht, ich denke, hier sind zu viele delays eingebaut, habe in Erinnerung, dass dies aus asynchromem 
 //aufruf heraus nicht funktioniert, werde daher nur ein Flag setzen und diese hier aus der main loop aufrufen
 //noch nicht drin: Umschaltung zwichen Bluetti laden, Deye vollständig und beide halb und halb
@@ -254,14 +319,17 @@ void adjustBluetti()
   const int right = 79; //erniedrigen "
 
   int dir=stop;
-  wsMsgSerial("Adjust Bluetti");
-  if (!power.eBluetti && power.bluettiPercent > 10)
+  ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluetti\"}");
+
+  if (!power.eBluetti && power.bluettiPercent > 10  )
   {
     wsMsgSerial("Bluetti hat mehr als 10 %");
     if (power.house > 0)
     {
       wsMsgSerial("Hausverbrauch > 0, schalte Bluetti an");
-      blue.switchOut((char *) "dc_output_on",(char *) "on");
+      blue.switchOut((char *) "dc_output_on",(char *) "on"); //glaube, das geht nicht, vielleicht weil die handleBluetooth geschichte nicht gerufen wird?
+      //ja daran lag es, aber es ist auch hier besser mit einem Flag zu arbeiten, dann werden die anderen Prozesse noch ausgeführt
+      blue.handleBluetooth();
       delay (1000);
       power.getByWebApi();
     }
@@ -269,7 +337,8 @@ void adjustBluetti()
     { //bluetti erhöhen so möglich
       dir = left;
       servo.write(dir);
-      while  (power.house > 15 && power.bluettiPercent > 10 && !power.eBluetti && power.blueInverter < 150)
+      servoStatus = ServoStatus::Left;
+      while  (power.house > 20 && power.bluettiPercent > 10 && !power.eBluetti && power.blueInverter < 150)
       {
         wsMsgSerial("Hausverbrauch > 0, in Schleife zum erhöhen Bluetti out ");
         delay(10);
@@ -283,17 +352,18 @@ void adjustBluetti()
       wsMsgSerial("Hausverbrauch <0, passe an");
       dir = right;        
       servo.write(dir);
-      while  (power.house < 15 && power.blueInverter>38) //kleiner als 34 klappt nicht 
+      servoStatus = ServoStatus::Right;
+      while  (power.house < -10 && power.blueInverter>38) //kleiner als 34 klappt nicht 
       {
         wsMsgSerial("Hausverbrauch < 5, Schleife zum erniedrigen Bluetti out ");
         power.getByWebApi();
         informClients();
         delay(20);
       }  
-      if (power.house < -5)
+      if (power.house < -35 && power.bluettiDCState)
       {
         blue.switchOut((char *) "dc_output_on",(char *) "off");
-        wsMsgSerial("Verbrauch < -5 schalte Blue aus");
+        wsMsgSerial("Verbrauch < -35 schalte Blue aus");
       }
     }
   }
@@ -303,6 +373,8 @@ void adjustBluetti()
     blue.switchOut((char *) "dc_output_on",(char *) "off");
   }
  servo.write(stop);
+ servoStatus = ServoStatus::Stop;
+
  adjustBluettiFlag = false; //und abschalten 
  ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluettiDone\"}");
 }
@@ -361,9 +433,15 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
           {
             blue.switchOut((char *) "dc_output_on", (const char *) doc["value"]);
             if (!strcmp((const char * )doc["value"],"on"))
+            {
+              power.bluettiDCState = true; //schon mal setzen, auch wenn es noch nicht stimmt
               strcat(confirmMessage,"bluettiDCOn");
+            }
             else 
+            {
+              power.bluettiDCState = false; 
               strcat(confirmMessage,"bluettiDCOff");
+            } 
           }
           //info an angeschlossene devices / smartphone muesste ueber bluetti(bluetooth)->dieser esp(websocket)-> angeschlosse devices laufen
       }
@@ -403,30 +481,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       }
       else if (!strcmp(doc["action"],"changeCharge"))
       {
-        if ( !strcmp(doc["value"],"bluettiOnly"))
-        {
-          schalteRelais("bR3on"); //strange syntax has "historical" reasons :-) hatte erst Testaufbau
-          schalteRelais("bR2on");
-          schalteRelais("bR4on");
-          schalteRelais("bR1on");
-          strcat(confirmMessage,"bluettiOnly");
-        }
-        else if ( !strcmp(doc["value"],"deyeOnly"))
-        {
-          schalteRelais("bR1off");
-          schalteRelais("bR2off");
-          schalteRelais("bR3off");
-          schalteRelais("bR4off");
-          strcat(confirmMessage,"deyeOnly");
-        }
-        else if ( !strcmp(doc["value"],"bluettiDeye"))
-        {
-          schalteRelais("bR1off");
-          schalteRelais("bR2off");
-          schalteRelais("bR3off");
-          schalteRelais("bR4on");
-          strcat(confirmMessage,"bluettiDeye");
-        }
+        schalteLaden((const char *) doc["value"]);
       }
     }
     if (strlen(confirmMessage)!=confirmLength)
@@ -539,10 +594,16 @@ void setup() {
   //eine kleine Pause von 50ms.
   delay(50);
 
+  //stelle definierten Zustand her
+  //power nur auf deye (wenn ich weg bin und der Würfel ist nicht da, dann sollte das der Standard sein)
+  schalteLaden("deyeOnly");//sendet confirm
+  //bluetti wird ausgeschaltet
+  power.bluettiDCState = false;
+  blue.switchOut((char *) "dc_output_on",(char *) "off");
+  servo.write(92); //stop
+  ws.textAll("{\"action\":\"confirm\",\"topic\":\"servoStop\"}");
+  ws.textAll("{\"action\":\"confirm\",\"topic\":\"bBlueDCOff\"}");
 }
-
-//Zahlen einlesen serial
-
 
 
 void loop() {
@@ -563,15 +624,16 @@ void loop() {
     informClients(); //
     //Serial.println("try to publish esp32solar/state online");
     //ein paar checks 
-    if (power.house < -10)
+    if (power.house < -10 && !power.eBluetti && power.bluettiDCState)
     {
       adjustBluettiFlag = true;
       ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluetti\"}");
     }
-    if (power.bluettiPercent <=10 && !power.eBluetti)
+    if (power.bluettiPercent <=10 && !power.eBluetti && power.bluettiDCState)
     { //auf nummer sicher gehen
       wsMsgSerial("Bluetti Low, schalte ab");
       blue.switchOut((char *) "dc_output_on",(char *) "off");
+      ws.textAll("{\"action\":\"confirm\",\"topic\":\"bBlueDCOff\"}");
     }  
   } 
  
