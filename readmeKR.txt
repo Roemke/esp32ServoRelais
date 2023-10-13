@@ -35,10 +35,10 @@ Rahmenbedingungen hier:
  und Lithium tiefentladung eigentlich egal ist, wer weiß wie gut das geht) 
  Wenn Solar <= Hausverbrauch oder Hausverbrauch groesser als 400 Watt 
     Verbrauchen, beide Panels am Deye-Inverter
-    regle Bluetti Inverter (wenn mehr als 10% und letzte Regelung liegt 10 Sekunden zurück)
+    regle Bluetti Inverter (wenn mehr als 10% )
  sonst 
     wenn Bluetti <=95%
-       wenn Hausverbrauch groesser als  150 Watt 
+       wenn Hausverbrauch groesser als  200 Watt 
             ein Panel an Deye, eines an Bluetti (mehr als 400 s. oben)
             evtl. regle Bluetti dazu 
        sonst  

@@ -143,7 +143,91 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         return template.content.firstChild;
       }
 
-      
+      function evaluateConfirm(topic)
+      {
+        let el = 0;
+        let elReset = false;
+        let offList = [];
+        switch (topic)
+        {
+          case "bluettiDCOn":
+            el = document.getElementById("bBlueDCOn");
+            offList=["bBlueDCOff"];
+          break;
+          case "bluettiDCOff":
+            el = document.getElementById("bBlueDCOff");
+            offList=["bBlueDCOn"];
+          break;
+          case "servoLeft":
+            el = document.getElementById("bServoLeft");
+            offList = ["bServoRight","bServoStop"];
+          break;
+          case "servoRight":
+            el = document.getElementById("bServoRight");
+            offList = ["bServoLeft","bServoStop"];
+          break;
+          case "servoStop":
+            el = document.getElementById("bServoStop"); 
+            offList = ["bServoRight","bServoLeft"];              			             			
+          break;
+          case "rebootESP":
+            el = document.getElementById("bReboot");
+            elReset = true;
+          break;
+          case "adjustBluettiStart":
+            el = document.getElementById("bAdjustBluetti");
+            offList = ["bAdjustBluettiStop"];              			
+          break;
+          case "adjustBluettiStop":
+            el = document.getElementById("bAdjustBluettiStop");
+            elReset = true;
+            offList = ["bAdjustBluetti"];              			
+          break;
+          case "bluettiOnly":
+            el = document.getElementById("bBluettiOnly");
+            offList = ["bDeyeOnly","bBluettiDeye"];              			
+          break;
+          case "deyeOnly":
+            el = document.getElementById("bDeyeOnly");
+            offList = ["bBluettiOnly","bBluettiDeye"];              			
+          break;
+          case "bluettiDeye":
+            el = document.getElementById("bBluettiDeye");
+            offList = ["bDeyeOnly","bBluettiOnly"];              												
+          break;									
+          case "autoChargeOn":
+            el = document.getElementById("bAutoChargeOn");
+            offList = ["bAutoChargeOff"];              												
+          break;									
+          case "autoChargeOff":
+            el = document.getElementById("bAutoChargeOff");
+            offList = ["bAutoChargeOn"];              												
+          break;									
+          case "autoAdjustBlueOff":
+            el = document.getElementById("bAutoAdjustBlueOff");
+            offList = ["bAutoAdjustBlueOn"];              												
+          break;									
+          case "autoAdjustBlueOn":
+            el = document.getElementById("bAutoAdjustBlueOn");
+            offList = ["bAutoAdjustBlueOff"];              												
+          break;									
+          //special
+          case "adjustBluettiDone": 
+            offList = ["bAdjustBluetti"];
+          break;	
+        }
+        if (el)
+        {
+            el.classList.remove("oneTouch");
+            el.classList.add("confirmedTouch");
+            if (elReset)
+              setTimeout( () => { el.classList.remove("confirmedTouch"); } ,3000);
+        }
+        //maybe switch buttons off
+        offList.forEach( el => document.getElementById(el).classList.remove("oneTouch","confirmedTouch") );
+        //offList.forEach( el => document.getElementById(el).classList.remove("oneTouch","confirmedTouch"); ); so nicht
+
+      }      
       function initWebSocket()
       { 
          websocket = new WebSocket(gateway);
@@ -196,88 +280,15 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
 
               break;
               case "confirm":
-                let el = 0;
-                let elReset = false;
-                let offList = [];
-              	switch (data.topic)
-              	{
-              		case "bluettiDCOn":
-              			el = document.getElementById("bBlueDCOn");
-              			offList=["bBlueDCOff"];
-									break;
-              		case "bluettiDCOff":
-              			el = document.getElementById("bBlueDCOff");
-              			offList=["bBlueDCOn"];
-									break;
-              		case "servoLeft":
-              			el = document.getElementById("bServoLeft");
-              			offList = ["bServoRight","bServoStop"];
-									break;
-              		case "servoRight":
-              			el = document.getElementById("bServoRight");
-              			offList = ["bServoLeft","bServoStop"];
-									break;
-              		case "servoStop":
-              			el = document.getElementById("bServoStop"); 
-              			offList = ["bServoRight","bServoLeft"];              			             			
-									break;
-              		case "rebootESP":
-              			el = document.getElementById("bReboot");
-              			elReset = true;
-									break;
-              		case "adjustBluettiStart":
-              			el = document.getElementById("bAdjustBluetti");
-              			offList = ["bAdjustBluettiStop"];              			
-									break;
-              		case "adjustBluettiStop":
-              			el = document.getElementById("bAdjustBluettiStop");
-                    elReset = true;
-              			offList = ["bAdjustBluetti"];              			
-									break;
-              		case "bluettiOnly":
-              			el = document.getElementById("bBluettiOnly");
-              			offList = ["bDeyeOnly","bBluettiDeye"];              			
-									break;
-              		case "deyeOnly":
-              			el = document.getElementById("bDeyeOnly");
-              			offList = ["bBluettiOnly","bBluettiDeye"];              			
-									break;
-              		case "bluettiDeye":
-              			el = document.getElementById("bBluettiDeye");
-              			offList = ["bDeyeOnly","bBluettiOnly"];              												
-									break;									
-              		case "autoChargeOn":
-              			el = document.getElementById("bAutoChargeOn");
-              			offList = ["bAutoChargeOff"];              												
-									break;									
-              		case "autoChargeOff":
-              			el = document.getElementById("bAutoChargeOff");
-              			offList = ["bAutoChargeOn"];              												
-									break;									
-              		case "autoAdjustBlueOff":
-              			el = document.getElementById("bAutoAdjustBlueOff");
-              			offList = ["bAutoAdjustBlueOn"];              												
-									break;									
-              		case "autoAdjustBlueOn":
-              			el = document.getElementById("bAutoAdjustBlueOn");
-              			offList = ["bAutoAdjustBlueOff"];              												
-									break;									
-									//special
-              		case "adjustBluettiDone": 
-              			offList = ["bAdjustBluetti"];
-									break;	
-              	}
-              	if (el)
-              	{
-              			el.classList.remove("oneTouch");
-              			el.classList.add("confirmedTouch");
-              			if (elReset)
-              				setTimeout( () => { el.classList.remove("confirmedTouch"); } ,3000);
-              	}
-              	//maybe switch buttons off
-              	offList.forEach( el => document.getElementById(el).classList.remove("oneTouch","confirmedTouch") );
-              	//offList.forEach( el => document.getElementById(el).classList.remove("oneTouch","confirmedTouch"); ); so nicht
+                evaluateConfirm(data.topic);
               break; 
+              case "status": // statt mehrere confirms, eine status-Meldung, kann aber genauso wie die confirm ausgewertet werden
+                if (document.activeElement.id != 'intervalAutoAdjust')
+                  document.getElementById('intervalAutoAdjust').value = data.intervalAutoAdjust;
+                if (document.activeElement.id != 'intervalAutoCharge')
+                  document.getElementById('intervalAutoCharge').value = data.intervalAutoCharge;
+                data.values.forEach(  evaluateConfirm );//sollte ein Array sein, dieses abarbeiten
+              break;
             } 
          }
       }
@@ -351,6 +362,14 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         { 
             websocket.send(JSON.stringify({'action':'autoAdjustBlue','value':'off'}));
         });
+        document.getElementById("intervalAutoCharge").addEventListener("change",evt =>
+        {
+            websocket.send(JSON.stringify({'action':'intervalAutoCharge','value':evt.target.value}));
+        });
+        document.getElementById("intervalAutoAdjust").addEventListener("change",evt =>
+        {
+            websocket.send(JSON.stringify({'action':'intervalAutoAdjust','value':evt.target.value}));
+        });
         
         let fButtons = document.querySelectorAll("button");  //allen buttons hinzufügen
         fButtons.forEach( element => 
@@ -405,17 +424,19 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
     <button id="bDeyeOnly"     type="button" >nur Haus/Deye</button>
     <button id="bBluettiDeye"  type="button" >beide </button>
 
-		<p>Automatische Wahl des Ladens (noch ohne Funktion)</p>
-		<button class="span3" type="button" id="bAutoChargeOn"  >an </button>
-		<button class="span3" type="button" id="bAutoChargeOff"  >aus </button>
-
     <p>Leistung Bluetti / Hausverbrauch: </p>
     <button class="span3" id="bAdjustBluetti"  type="button">BluettiOut anpassen</button>
     <button class="span3" id="bAdjustBluettiStop"  type="button">Anpassung abbrechen</button>
 
-		<p>Automatisches Anpassen der Leistung der Bluetti (noch ohne Funktion) </p>
-		<button class="span3" type="button" id="bAutoAdjustBlueOn"  >an </button>
-		<button class="span3" type="button" id="bAutoAdjustBlueOff"  >aus </button>
+  	<p>Automatische Wahl des Ladens (noch ohne Funktion)</p>
+		<button type="button" id="bAutoChargeOn"  >an </button>
+		<button type="button" id="bAutoChargeOff"  >aus </button>
+    <label>Min.: <input type="number" size=4 id="intervalAutoCharge" ></label>
+
+  	<p>Automatisches Anpassen der Leistung der Bluetti (noch ohne Funktion) </p>
+		<button type="button" id="bAutoAdjustBlueOn"  >an </button>
+		<button type="button" id="bAutoAdjustBlueOff"  >aus </button>
+    <label>Min.: <input type="number" size=4 id="intervalAutoAdjust"></label>
     
 		<h3>Die folgenden Buttons sollten nicht / nur selten notwendig sein </h3>
 
@@ -429,7 +450,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
 		<button type="button"  id="bServoRight"> verringern</button>
 		<button type="button"  id="bServoStop"> Stop</button>
   </div>
-  
+
     <!-- relais dürfen nicht mehr unabhängig geschaltet werden 
     <form id="fRelais">
       <button id="bR1on"   type="button">R1 on</button>
@@ -449,6 +470,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
     <p>Beim Umschalten auf &quot;nur Haus versorgen (Deye)&quot; dauert es einige Zeit, bis der Deye-Inverter merkt, dass er von den Solarzellen versorgt wird, falls vorher nur die Bluetti geladen wurde.  
     </p>
     <p>BluettiOut anpassen versucht die Leistung der Bluetti an den Hausverbrauch anzupassen. Noch wird hier nicht zwischen Bluetti laden, beide Laden und nur Deye versorgen umgeschaltet, das soll noch kommen. </p>
+    <p>Die Auto-Einstellungen haben ein Intervall, in dem Sie durchgeführt werden, Voreinstellung alle 5 Minuten. </p>
     <div class = "hinweis">Ein Update der Firmware / des Sketches kann &uuml;ber OTA erfolgen.
       <ol>
         <li>Bin-Datei erzeugen, in der IDE Sketch -> Kompilierte ... exportieren oder Strg Alt s </li>
