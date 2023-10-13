@@ -230,8 +230,24 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
               			el = document.getElementById("bBluettiDeye");
               			offList = ["bDeyeOnly","bBluettiOnly"];              												
 									break;									
+              		case "autoChargeOn":
+              			el = document.getElementById("bAutoChargeOn");
+              			offList = ["bAutoChargeOff"];              												
+									break;									
+              		case "autoChargeOff":
+              			el = document.getElementById("bAutoChargeOff");
+              			offList = ["bAutoChargeOn"];              												
+									break;									
+              		case "autoAdjustBlueOff":
+              			el = document.getElementById("bAutoAdjustBlueOff");
+              			offList = ["bAutoAdjustBlueOn"];              												
+									break;									
+              		case "autoAdjustBlueOn":
+              			el = document.getElementById("bAutoAdjustBlueOn");
+              			offList = ["bAutoAdjustBlueOff"];              												
+									break;									
 									//special
-              		case "adjustBluettiDone": //noch nicht fertig
+              		case "adjustBluettiDone": 
               			offList = ["bAdjustBluetti"];
 									break;	
               	}
@@ -299,6 +315,22 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         { 
             websocket.send(JSON.stringify({'action':'changeCharge','value':'bluettiDeye'}));
         });
+        document.getElementById('bAutoChargeOn').addEventListener("click",() => 
+        { 
+            websocket.send(JSON.stringify({'action':'autoCharge','value':'on'}));
+        });
+        document.getElementById('bAutoChargeOff').addEventListener("click",() => 
+        { 
+            websocket.send(JSON.stringify({'action':'autoCharge','value':'off'}));
+        });
+        document.getElementById('bAutoAdjustBlueOn').addEventListener("click",() => 
+        { 
+            websocket.send(JSON.stringify({'action':'autoAdjustBlue','value':'on'}));
+        });
+        document.getElementById('bAutoAdjustBlueOff').addEventListener("click",() => 
+        { 
+            websocket.send(JSON.stringify({'action':'autoAdjustBlue','value':'off'}));
+        });
         
         let fButtons = document.querySelectorAll("button");  //allen buttons hinzufügen
         fButtons.forEach( element => 
@@ -354,10 +386,10 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
 		<div>Automatische Wahl des Ladens (noch ohne Funktion)</div>
 		<div><button type="button" id="bAutoChargeOn"  >an </button></div>
 		<div><button type="button" id="bAutoChargeOff"  >aus </button></div>
-    <p>Leistung der Bluetti und  Hausverbrauch: <button id="bAdjustBluetti"  type="button">BluettiOut anpassen</button> </p>
+    <p>Leistung Bluetti / Hausverbrauch: <button id="bAdjustBluetti"  type="button">BluettiOut anpassen</button> </p>
 		<div>Automatisches Anpassen der Leistung der Bluetti (noch ohne Funktion) </div>
-		<div><button type="button" id="bAutoAdjustOn"  >an </button></div>
-		<div><button type="button" id="bAutoAdjustOff"  >aus </button></div>
+		<div><button type="button" id="bAutoAdjustBlueOn"  >an </button></div>
+		<div><button type="button" id="bAutoAdjustBlueOff"  >aus </button></div>
     
 		<p>Die folgenden Buttons sollten nicht / nur selten notwendig sein </p>
 		<div>Bluetti DC Einspeisung</div>

@@ -98,6 +98,9 @@ long lastMsg = 0;
 long lastBluettiAdjust = 0;
 bool adjustBluettiFlag = false;
 bool adjustBluettiFinished = false; // noch nicht im Einsatz 
+bool autoAdjustBlue = false;
+bool autoCharge = false;
+
 
 AsyncWebServer server(80);
 //fuer den Websocket
@@ -158,6 +161,15 @@ void informClients()
   else if (servoStatus == ServoStatus::Stop)
     ws.textAll("{\"action\":\"confirm\",\"topic\":\"servoStop\"}"); 
 
+  if (autoCharge)
+    ws.textAll("{\"action\":\"confirm\",\"topic\":\"autoChargeOn\"}");
+  else
+    ws.textAll("{\"action\":\"confirm\",\"topic\":\"autoChargeOff\"}");  
+
+  if (autoAdjustBlue)
+    ws.textAll("{\"action\":\"confirm\",\"topic\":\"autoAdjustBlueOn\"}");
+  else
+    ws.textAll("{\"action\":\"confirm\",\"topic\":\"autoAdjustBlueOff\"}");  
 
 }
 //alle daten, die am Anfang gesendet werden
@@ -483,6 +495,33 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       {
         schalteLaden((const char *) doc["value"]);
       }
+      else if (!strcmp(doc["action"], "autoCharge"))
+      {
+        if (!strcmp((const char * )doc["value"],"on"))
+        {
+          autoCharge = true; //schon mal setzen, auch wenn es noch nicht stimmt
+          strcat(confirmMessage,"autoChargeOn");
+        }
+        else 
+        {
+          autoCharge = false; 
+          strcat(confirmMessage,"autoChargeOff");
+        }         
+      }
+      else if (!strcmp(doc["action"], "autoAdjustBlue"))
+      {
+        if (!strcmp((const char * )doc["value"],"on"))
+        {
+          autoAdjustBlue = true; //schon mal setzen, auch wenn es noch nicht stimmt
+          strcat(confirmMessage,"autoAdjustBlueOn");
+        }
+        else 
+        {
+          autoAdjustBlue = false; 
+          strcat(confirmMessage,"autoAdjustBlueOff");
+        }         
+      }
+
     }
     if (strlen(confirmMessage)!=confirmLength)
     {
@@ -602,7 +641,10 @@ void setup() {
   blue.switchOut((char *) "dc_output_on",(char *) "off");
   servo.write(92); //stop
   ws.textAll("{\"action\":\"confirm\",\"topic\":\"servoStop\"}");
-  ws.textAll("{\"action\":\"confirm\",\"topic\":\"bBlueDCOff\"}");
+  ws.textAll("{\"action\":\"confirm\",\"topic\":\"bluettiDCOff\"}");
+  ws.textAll("{\"action\":\"confirm\",\"topic\":\"autoChargeOff\"}");
+  ws.textAll("{\"action\":\"confirm\",\"topic\":\"autoAdjustBlueOff\"}");
+
 }
 
 
