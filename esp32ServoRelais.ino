@@ -91,7 +91,7 @@ const int r2pin = 18;
 const int r3pin = 19;
 const int r4pin = 23;
 
-enum class ServoStatus {Left,Right,Stop} servoStatus;
+enum class ServoStatus {Left=105,Right=79,Stop=92} servoStatus;
 enum class LadeStatus  {DeyeOnly,BluettiOnly,BluettiDeye} ladeStatus;
   
 long lastMsg = 0;
@@ -326,11 +326,6 @@ void schalteLaden(const char * dest)
 //noch nicht drin: Umschaltung zwichen Bluetti laden, Deye vollständig und beide halb und halb
 void adjustBluetti()
 {
-  const int stop = 92;
-  const int left = 105; //erhöhen Leistung bluetti an Haus
-  const int right = 79; //erniedrigen "
-
-  int dir=stop;
   ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluetti\"}");
 
   if (!power.eBluetti && power.bluettiPercent > 10  )
@@ -347,9 +342,8 @@ void adjustBluetti()
     }
     if (power.house > 0)
     { //bluetti erhöhen so möglich
-      dir = left;
-      servo.write(dir);
       servoStatus = ServoStatus::Left;
+      servo.write((int) servoStatus);
       while  (power.house > 20 && power.bluettiPercent > 10 && !power.eBluetti && power.blueInverter < 150)
       {
         wsMsgSerial("Hausverbrauch > 0, in Schleife zum erhöhen Bluetti out ");
@@ -362,9 +356,8 @@ void adjustBluetti()
     else if (power.house < 0)
     {
       wsMsgSerial("Hausverbrauch <0, passe an");
-      dir = right;        
-      servo.write(dir);
       servoStatus = ServoStatus::Right;
+      servo.write((int) servoStatus);
       while  (power.house < -10 && power.blueInverter>38) //kleiner als 34 klappt nicht 
       {
         wsMsgSerial("Hausverbrauch < 5, Schleife zum erniedrigen Bluetti out ");
@@ -384,8 +377,8 @@ void adjustBluetti()
     wsMsgSerial("Bluetti Low, schalte ab");
     blue.switchOut((char *) "dc_output_on",(char *) "off");
   }
- servo.write(stop);
  servoStatus = ServoStatus::Stop;
+ servo.write((int) servoStatus);
 
  adjustBluettiFlag = false; //und abschalten 
  ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluettiDone\"}");
@@ -460,21 +453,26 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       else if ( strcmp(doc["action"],"servo")==0)
       {
             //wsMsgSerial(buffer);
-            int val = 92;
-            if (!strcmp(doc["value"],"left"))
-            { 
-              val = 99;
-              strcat(confirmMessage,"servoLeft");
-            }  
-            else if (!strcmp(doc["value"],"right"))
+            
+            if (power.bluettiDCState && !power.eBluetti) //nur wenn Bluetti auch an ist
             {
-              val = 85; 
-              strcat(confirmMessage,"servoRight");
+              if (!strcmp(doc["value"],"left"))
+              { 
+                servoStatus = ServoStatus::Left;
+                strcat(confirmMessage,"servoLeft");
+              }  
+              else if (!strcmp(doc["value"],"right"))
+              {
+                servoStatus = ServoStatus::Right;
+                strcat(confirmMessage,"servoRight");
+              }
             }
-            else
+            else //sonst just stop
+            { 
               strcat(confirmMessage,"servoStop");
-            servo.write(val);    
-            wsMsgSerial("turn Servo");
+              servoStatus = ServoStatus::Stop;
+            }  
+            servo.write((int) servoStatus);    
       }
       else if (strcmp(doc["action"],"rebootESP")==0)
       {
@@ -488,8 +486,17 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       }
       else if (!strcmp(doc["action"],"adjustBluetti"))
       {
-        strcat(confirmMessage,"adjustBluetti");
-        adjustBluettiFlag = true; //hier flag setzen statt aufzurufen
+        if (!strcmp(doc["value"],"start"))
+        {
+          strcat(confirmMessage,"adjustBluettiStart");
+          adjustBluettiFlag = true; //hier flag setzen statt aufzurufen
+        }
+        else 
+        {
+          strcat(confirmMessage,"adjustBluettiStop");
+          adjustBluettiFlag = false; //hier flag setzen statt aufzurufen
+          autoAdjustBlue = false;
+        }
       }
       else if (!strcmp(doc["action"],"changeCharge"))
       {
@@ -639,7 +646,10 @@ void setup() {
   //bluetti wird ausgeschaltet
   power.bluettiDCState = false;
   blue.switchOut((char *) "dc_output_on",(char *) "off");
-  servo.write(92); //stop
+  servoStatus = ServoStatus::Stop;
+  servo.write((int) servoStatus); //stop
+  autoCharge =false;
+  autoAdjustBlue = false; 
   ws.textAll("{\"action\":\"confirm\",\"topic\":\"servoStop\"}");
   ws.textAll("{\"action\":\"confirm\",\"topic\":\"bluettiDCOff\"}");
   ws.textAll("{\"action\":\"confirm\",\"topic\":\"autoChargeOff\"}");

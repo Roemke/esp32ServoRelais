@@ -14,23 +14,12 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       li input  {
         width: 15em;
       }
-      input:nth-of-type(2){
-        width: 25em;
-      }
-      table td {
-        margin-left: 3em;
-      }
       
       #divNachrichten {
         border: 1px solid blue;
         padding: 1em;
         margin-top:  1em;
         margin-left: 1em;
-      }
-      ul {
-        border: 1px solid blue;
-        padding: 1em;
-        list-style-type: none;
       }
       h1 {
         font-size: 135%%; /* im Template keine Prozentangababen moeglich :-), leistet template ein..., %% - yes */
@@ -60,42 +49,64 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       #dInfo h2 {
       	 grid-column: 1 / span 2;
       }
-      #dManuell {
-        display: grid;
-        gap: 		0.5em  2em; /* row column */ 
-        grid-template-columns: auto auto auto;   
-        justify-content: start;     
+
+      @media only screen { 
+          #dManuell {
+              display: grid;
+              gap: 		0.5em  1em; /* row column */ 
+              grid-template-columns: auto auto auto auto auto auto auto auto ;   
+              justify-content: start;
+              justify-items: stretch; /* in der spalte */   
+              align-items: center; /* in der zeile */
+            }
+      }
+
+      @media only screen and (max-width: 800px) { 
+          #dManuell {
+              display: grid;
+              gap: 		0.5em  2em; /* row column */ 
+              grid-template-columns: auto auto auto auto auto auto ;   
+              justify-content: start;
+              justify-items: stretch; /* in der spalte */   
+              align-items: center; /* in der zeile */
+            }
+            #dManuell p {
+              grid-column: 1 / -1 ; /* kleines Display, paragraphen über ganze Zeile */
+              margin-top: 0em;
+            }
+        #dManuell button {margin-bottom: 1em;}
       }
       #dManuell * {
       	margin-top: 0em;
       	margin-bottom: 0em; 
+        grid-column: auto / span 2;
       }
-      #dManuell p,h2 {
-      	grid-column: 1 / span 3;
-      	margin-top: 0.5em;
+      #dManuell h2, #dManuell h3 {
+      	grid-column: 1 / -1; /* bis zum Ende */
+      	padding-top: 1em;
       	margin-bottom: 0.5em;
       }
-      #dManuell .oneLine{
-      	grid-column: 1 / span 3;
+       .framed { 
+       border: 1px solid black; 
+       padding: 1em;
       }
+      #dManuell .span3 {
+        grid-column: auto / span 3;
+      }      
       
       #controlContainer { /* hmm ein grid ist etwas übertrieben */
           display: grid;
           background-color: #fafaff;
           /*  grid-template-rows: 20%% 20%% 20%% 20%% 20%% ; sowieso automatisch */
-           grid-template-columns: 30%% 1fr minmax(min-content,8em) 10%%;
+           grid-template-columns: 80%%  20%%;
            grid-auto-flow: column;
            padding-bottom: 0em; 
            /*justify-items: center; */             
       }
       #controlContainer h1 {
-        display: inline-block;
-        grid-row-start: 1; /* beachte rasterlinien, nicht zeilen, oben unten ist linie */ 
-        grid-row-end  : 7;
         font-size: 130%%; 
       }
       #controlContainer button {
-        grid-column-start: 3;
         margin-top: 0.5em;
       }
       #status {
@@ -214,9 +225,14 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
               			el = document.getElementById("bReboot");
               			elReset = true;
 									break;
-              		case "adjustBluetti":
+              		case "adjustBluettiStart":
               			el = document.getElementById("bAdjustBluetti");
-              			offList = ["bBluettiOnly","bDeyeOnly","bBluettiDeye"];              			
+              			offList = ["bAdjustBluettiStop"];              			
+									break;
+              		case "adjustBluettiStop":
+              			el = document.getElementById("bAdjustBluettiStop");
+                    elReset = true;
+              			offList = ["bAdjustBluetti"];              			
 									break;
               		case "bluettiOnly":
               			el = document.getElementById("bBluettiOnly");
@@ -300,7 +316,11 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
 				//anpassen der Leistung von Bluetti ins Hausnetz
         document.getElementById('bAdjustBluetti').addEventListener("click",() => 
         { 
-            websocket.send(JSON.stringify({'action':'adjustBluetti','value':''}));
+            websocket.send(JSON.stringify({'action':'adjustBluetti','value':'start'}));
+        });
+        document.getElementById('bAdjustBluettiStop').addEventListener("click",() => 
+        { 
+            websocket.send(JSON.stringify({'action':'adjustBluetti','value':'stop'}));
         });
         //Ladeverhalten, Relais schalten
         document.getElementById('bBluettiOnly').addEventListener("click",() => 
@@ -379,28 +399,37 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
     </div>
   <div class="framed" id = "dManuell">
     <h2> manuelle Schalter und Information</h2>
+
     <p>Welche Art des Ladens, 3 Möglichkeiten </p>
-    <div><button id="bBluettiOnly"  type="button" >nur Bluetti</button></div>
-    <div><button id="bDeyeOnly"     type="button" >nur Haus/Deye</button></div>
-    <div><button id="bBluettiDeye"  type="button" >beide </button></div>
-		<div>Automatische Wahl des Ladens (noch ohne Funktion)</div>
-		<div><button type="button" id="bAutoChargeOn"  >an </button></div>
-		<div><button type="button" id="bAutoChargeOff"  >aus </button></div>
-    <p>Leistung Bluetti / Hausverbrauch: <button id="bAdjustBluetti"  type="button">BluettiOut anpassen</button> </p>
-		<div>Automatisches Anpassen der Leistung der Bluetti (noch ohne Funktion) </div>
-		<div><button type="button" id="bAutoAdjustBlueOn"  >an </button></div>
-		<div><button type="button" id="bAutoAdjustBlueOff"  >aus </button></div>
+    <button id="bBluettiOnly"  type="button" >nur Bluetti</button>
+    <button id="bDeyeOnly"     type="button" >nur Haus/Deye</button>
+    <button id="bBluettiDeye"  type="button" >beide </button>
+
+		<p>Automatische Wahl des Ladens (noch ohne Funktion)</p>
+		<button class="span3" type="button" id="bAutoChargeOn"  >an </button>
+		<button class="span3" type="button" id="bAutoChargeOff"  >aus </button>
+
+    <p>Leistung Bluetti / Hausverbrauch: </p>
+    <button class="span3" id="bAdjustBluetti"  type="button">BluettiOut anpassen</button>
+    <button class="span3" id="bAdjustBluettiStop"  type="button">Anpassung abbrechen</button>
+
+		<p>Automatisches Anpassen der Leistung der Bluetti (noch ohne Funktion) </p>
+		<button class="span3" type="button" id="bAutoAdjustBlueOn"  >an </button>
+		<button class="span3" type="button" id="bAutoAdjustBlueOff"  >aus </button>
     
-		<p>Die folgenden Buttons sollten nicht / nur selten notwendig sein </p>
-		<div>Bluetti DC Einspeisung</div>
-		<div><button type="button" id="bBlueDCOn"  >an </button></div>
-		<div><button type="button" id="bBlueDCOff"  >aus </button></div>
-		<!------- Servo (testen) -->
-		<p> Servo steuern (links / rechts / stop), die Einspeisung durch Bluetti ändern oder Änderung stoppen  </p>
-		<div><button type="button"  id="bServoLeft"> erhöhen</button></div>
-		<div><button type="button"  id="bServoRight"> verringern</button></div>
-		<div><button type="button"  id="bServoStop"> Stop</button></div>
-    </div>
+		<h3>Die folgenden Buttons sollten nicht / nur selten notwendig sein </h3>
+
+		<p>Bluetti DC Einspeisung</p>
+		<button class="span3" type="button" id="bBlueDCOn"  >an </button>
+		<button class="span3" type="button" id="bBlueDCOff"  > aus </button>
+  
+    <!-- Servo (testen) -->
+		<p> Servo steuern (links / rechts / stop), die Einspeisung durch Bluetti ändern oder Änderung stoppen (nur wenn Bluetti DC auch an ist)  </p>
+		<button type="button"  id="bServoLeft"> erhöhen</button>
+		<button type="button"  id="bServoRight"> verringern</button>
+		<button type="button"  id="bServoStop"> Stop</button>
+  </div>
+  
     <!-- relais dürfen nicht mehr unabhängig geschaltet werden 
     <form id="fRelais">
       <button id="bR1on"   type="button">R1 on</button>
