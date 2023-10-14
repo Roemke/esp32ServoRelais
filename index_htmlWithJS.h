@@ -419,7 +419,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
   <div class="framed" id = "dManuell">
     <h2> manuelle Schalter und Information</h2>
 
-    <p>Welche Art des Ladens, 3 Möglichkeiten </p>
+    <p>Art der Solar-Einspeisung </p>
     <button id="bBluettiOnly"  type="button" >nur Bluetti</button>
     <button id="bDeyeOnly"     type="button" >nur Haus/Deye</button>
     <button id="bBluettiDeye"  type="button" >beide </button>
@@ -428,12 +428,12 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
     <button class="span3" id="bAdjustBluetti"  type="button">BluettiOut anpassen</button>
     <button class="span3" id="bAdjustBluettiStop"  type="button">Anpassung abbrechen</button>
 
-  	<p>Automatische Wahl des Ladens (noch ohne Funktion)</p>
+  	<p>Automatische Wahl der Solar-Einspeisung</p>
 		<button type="button" id="bAutoChargeOn"  >an </button>
 		<button type="button" id="bAutoChargeOff"  >aus </button>
     <label>Min.: <input type="number" size=4 id="intervalAutoCharge" ></label>
 
-  	<p>Automatisches Anpassen der Leistung der Bluetti (noch ohne Funktion) </p>
+  	<p>Automatisches Anpassen der Leistung der Bluetti </p>
 		<button type="button" id="bAutoAdjustBlueOn"  >an </button>
 		<button type="button" id="bAutoAdjustBlueOff"  >aus </button>
     <label>Min.: <input type="number" size=4 id="intervalAutoAdjust"></label>
@@ -466,10 +466,15 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
     <h2>Erl&auml;uterungen</h2>
     <p>Zeigt den Zustand der Solar-Geschichten an und ermöglicht teilweise das Schalten. </p>
     <p> Bei einem Click auf einen Button wird dies farblich (hellgrün) signalisiert. Bestätigt der Server die Aktion, so wird die Farbe erneut geändert (nun grün). Geht i.d.R. so schnell, dass man 
-    nur die  Änderung der Farbe nicht sieht.</p>
-    <p>Beim Umschalten auf &quot;nur Haus versorgen (Deye)&quot; dauert es einige Zeit, bis der Deye-Inverter merkt, dass er von den Solarzellen versorgt wird, falls vorher nur die Bluetti geladen wurde.  
+    nur die  Änderung der Farbe nicht sieht. Bei den Schalt-Prozessen, die die Bluetti betreffen springt die Anzeige ggf. auch nochmal zurück, da es eine Zeit dauert, 
+    bis die Bluetti reagiert (Bluetooth?)</p>
+    <p>Die Anpassung der Einspeisung der Solar-Energie dürfte selbsterklärend sein, natürlich geht nur eine der drei Optionen, die Leistung der Bluetti wird hier nicht 
+    angepasst, es werden nur die Stromkreise per Relais geändert.<br> 
+    Beim Umschalten auf &quot;nur Haus versorgen (Deye)&quot; dauert es einige Zeit, bis der Deye-Inverter merkt, dass er von den Solarzellen versorgt wird, 
+    falls vorher nur die Bluetti geladen wurde.  
     </p>
-    <p>BluettiOut anpassen versucht die Leistung der Bluetti an den Hausverbrauch anzupassen. Noch wird hier nicht zwischen Bluetti laden, beide Laden und nur Deye versorgen umgeschaltet, das soll noch kommen. </p>
+    <p>BluettiOut anpassen versucht die Leistung der Bluetti an den Hausverbrauch anzupassen. Hier wird nicht zwischen Bluetti laden, beide Laden und nur Deye versorgen 
+    umgeschaltet, das ist (zunächst?) separat gehalten. Hier wird der Servo-Motor angesteuert.</p>
     <p>Die Auto-Einstellungen haben ein Intervall, in dem Sie durchgeführt werden, Voreinstellung alle 5 Minuten. </p>
     <div class = "hinweis">Ein Update der Firmware / des Sketches kann &uuml;ber OTA erfolgen.
       <ol>

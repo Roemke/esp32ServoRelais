@@ -301,7 +301,7 @@ void schalteLaden(const char * dest)
     ladeStatus = LadeStatus::BluettiOnly;
     strcat(confirmMessage,"bluettiOnly");
   }
-  else if ( !strcmp(dest,"deyeOnly") && ladeStatus != LadeStatus::DeyeOnly)
+  else if ( (!strcmp(dest,"deyeOnly") && ladeStatus != LadeStatus::DeyeOnly) || !strcmp(dest,"initialDeyeOnly"))
   {
     schalteRelais("bR1off");
     schalteRelais("bR2off");
@@ -484,8 +484,10 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       else if (strcmp(doc["action"],"rebootESP")==0)
       {
         wsMsgSerial("Restart of ESP");
+        ws.closeAll();
+        delay(1000);
         strcat(confirmMessage,"rebootESP");
-        ESP.restart();
+        ESP.restart(); //Restart behält den Zustand des pins für die relais bei - den Servo auch?
       }
       else if (!strcmp(doc["action"],"relais"))
       { //nicht mehr unabhängig schalten
@@ -655,7 +657,7 @@ void setup() {
 
   //stelle definierten Zustand her
   //power nur auf deye (wenn ich weg bin und der Würfel ist nicht da, dann sollte das der Standard sein)
-  schalteLaden("deyeOnly");//sendet confirm
+  schalteLaden("initialDeyeOnly");//sendet confirm
   //bluetti wird ausgeschaltet
   power.bluettiDCState = false;
   blue.switchOut((char *) "dc_output_on",(char *) "off");
@@ -713,13 +715,13 @@ void loop() {
     if (solar < power.house || power.house  > 400 )
     {
       schalteLaden("deyeOnly");
-      adjustBluettiFlag = true;
+      //adjustBluettiFlag = true; lassen wir
     }
     else 
     {
       if (power.bluettiPercent <= 95)
       {
-        adjustBluettiFlag = true;
+        //lassen wiradjustBluettiFlag = true;
         if (power.house > 200)
           schalteLaden("bluettiDeye");
         else 
