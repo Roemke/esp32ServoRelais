@@ -337,13 +337,13 @@ void handleAdjustBluetti()
   {
     if (!power.eBluetti && power.bluettiPercent > 10  )
     {
-      if (power.house > 0 && ! power.bluettiDCState )
+      if (power.house > 0 && ! power.bluettiDCState  && power.blueInverter < 10 ) //power.blueInverter reagiert schneller als der bluetooth state
       {
         wsMsgSerial("Hausverbrauch > 0, schalte Bluetti an");
         blue.switchOut((char *) "dc_output_on",(char *) "on"); //glaube, das geht nicht, vielleicht weil die handleBluetooth geschichte nicht gerufen wird?
         //ja daran lag es, aber es ist auch hier besser mit einem Flag zu arbeiten, dann werden die anderen Prozesse noch ausgeführt
         blue.handleBluetooth();
-        delay (1000);
+        delay (500);
       }
       if (power.house > 20 && power.bluettiPercent > 10 && !power.eBluetti && power.blueInverter < 170)
       {
@@ -353,7 +353,7 @@ void handleAdjustBluetti()
           servo.write((int) servoStatus);
         }
         wsMsgSerial("Hausverbrauch > 0, bleibe beim Erhöhen der Bluetti ");
-        delay (1000);
+        delay (500);
       } 
       else if (power.house < -10 && power.blueInverter>38) //kleiner als 34 klappt nicht
       {
@@ -363,8 +363,8 @@ void handleAdjustBluetti()
           servo.write((int) servoStatus);
         }
         wsMsgSerial("Hausverbrauch <0, bleibe beim Verringern der Bluetti");
-        delay (1000);
-        if (power.house < -35 && power.bluettiDCState)
+        delay (500);
+        if (power.house < -35 && power.bluettiDCState && power.blueInverter > 20) //power.blueInverter reagiert schneller als der bluetooth state
         {
           blue.switchOut((char *) "dc_output_on",(char *) "off");
           wsMsgSerial("Verbrauch < -35 schalte Blue aus");
