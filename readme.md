@@ -20,17 +20,18 @@ Bisher läuft
    ist nicht perfekt aber geht
  - alles auf github geschoben     
  - dieses gerät kann als mqtt in fhem eingebunden werden, es bekommt von fhem 
-   die daten gesendet
+   die daten gesendet, dies nur im mqtt branch, der seit ein paar Wochen nicht mehr weiter entwickelt wird. 
  
 littlefs macht aerger - seltsam - brauche ich das? - erstmal raus
 
 Rahmenbedingungen hier: 
- Grundverbrauch ca. 80 W wenn nichts läuft
+ Grundverbrauch ca. 80 W wenn nichts läuft (ohne Heizung, die nimmt sich noch etwas9
  Speicherwürfel Bluetti kann einspeisen, zwischen 0 und 150 Watt ist es sinnvoll
  geht nur bis 150-200 Watt, dann heizt der Inverter zu viel - von wegen 500 W
  die Leistung, die der Inverter liefert und die die Bluetti liefert weichen 
  immer stärker voneinander ab. 
 
+Erste Überlegungen:
  sinnvolle automatisierung wäre (Bluetti bei 10% ausschalten, auch wenn sie selbst abschaltet, 
  und Lithium tiefentladung eigentlich egal ist, wer weiß wie gut das geht) 
  Wenn Solar <= Hausverbrauch oder Hausverbrauch groesser als 400 Watt 
@@ -45,9 +46,9 @@ Rahmenbedingungen hier:
          Lade Bluetti mit 2 Panels und regle Bluetti Inverter
     sonst 
        beide Panels an Deye Inverter
-
-Manuelles schalten sollte möglich sein, Automatik dann aus 
-Regelung des Inverters mittels Servos sollte eine Art hysterese berücksichtigen, damit das Teil nicht dauernd dreht
+Irgendetwas in der obigen Richtung umgesetzt :-)
+Manuelles schalten sollte möglich sein, Automatik dann aus (nicht getan) 
+Regelung des Inverters mittels Servos sollte eine Art hysterese berücksichtigen, damit das Teil nicht dauernd dreht, nein, ist nicht zwingend funktioniert auch so, checke nur alle paar Minuten die Anpassung. 
 
 
 Schaltung mit 4er Relais, für Voll laden von Bluetti müssen die Panels in Reihe geschaltet sein
@@ -93,14 +94,14 @@ und bin auf arduino 2.1 gewechselt. jetzt bekomme ich den Servo nicht mehr zum l
 Bluetooth funktioniert auch nicht mehr, scheint sich aufzuhängen, warning beim compilieren
 
 warning beim compilieren lässt sich eliminieren, durch verwendung anderer methode, aber das ganze
-funktioniert nicht mehr, ich bekomme keine Verbindung mehr zu dem Teil
-Problem ist natürlich auch, dass ich die Bluetooth funktionalität kopiert habe um dann eine eigene klasse zu 
-bauen, ohne die Thematik wirklich zu verstehen.
+funktioniert nicht mehr, ich bekomme keine Verbindung mehr zu dem Teil.
+Problem ist natürlich auch, dass ich die Bluetooth funktionalität kopiert habe um dann eine eigene klasse zu bauen, ohne die Thematik wirklich zu verstehen.
 
-Nein, das stimmt so nicht, der connect funktioniert, den Write Request kann ich senden, offenbar liefert Bluetti Bluetooth dann
-eine Antwort - jedenfalls wenn man die 1.4.0 der Bibliothek verwendet, in der 1.4.1 wird mein Callback nicht aufgerufen. 
+Nein, das stimmt so nicht, der connect funktioniert, den Write Request kann ich senden, offenbar liefert Bluetti Bluetooth dann eine Antwort - jedenfalls wenn man die 1.4.0 der Bibliothek verwendet, in der 1.4.1 wird mein Callback nicht aufgerufen. Nochmal das NimBLE analysiert, erkenne keinen Fehler in meinem (kopierten) Code. Verwende halt 1.4.0 dann geht es. 
+Servo das gleiche Problem, siehe readmeServo, auch hier geht eine ältere Version, die neuere will einen neuen gcc und damit läuft das compilieren des Boards nicht. 
 
 Leider dauert es eine Zeit bis der Deye Inverter realisiert, dass er wieder Solar-Spannung hat
 so 5 - 10 Minuten scheinen normal zu sein eigentlich müsste das aber doch normal sein, wenn er morgens aufwacht.
 
+Todo: Warning AsynchTCP nicht verwenden o.ä. anscheinend unterstützen auch die normalen Libraries jetzt asynd, nicht weiter geschaut. 
 
