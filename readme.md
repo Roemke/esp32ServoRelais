@@ -5,9 +5,10 @@ Ziel:
  - bluetti auslesen und darstellen
  - Wert aus Tasmota IR-Kopf auslesen und darstellen 
  - Wert aus Tasmota Steckdose Bluetti-Inverter 
- - Wert aus Tasmota Steckdose Solar-Inverter (deye) (existiert noch nicht)
+ - Wert aus Tasmota Steckdose Solar-Inverter (deye) 
+ - bisschen Automatik einbauen 
 
-Die Tasmota-Devices senden per mqtt an fhem 
+Die Tasmota-Devices senden per mqtt an fhem, verwende die Werte hier nicht mehr, frage direkt ab. 
 
 Bisher läuft 
  - Der Webserver mit websockets (da ich ihn vorher hatte)
@@ -21,6 +22,8 @@ Bisher läuft
  - alles auf github geschoben     
  - dieses gerät kann als mqtt in fhem eingebunden werden, es bekommt von fhem 
    die daten gesendet, dies nur im mqtt branch, der seit ein paar Wochen nicht mehr weiter entwickelt wird. 
+ - umgestellt auf webapi der verschiedenen tasmota-devices, eine Steckdose am Deye-Inverter, eine Steckdose am Inverter, der über 12 Volt von der Bluetti versorgt wird, ein IR-Lesekopf mit 
+   spezieller Tasmota-Version um den Stromzähler auszulesen
  
 littlefs macht aerger - seltsam - brauche ich das? - erstmal raus
 
