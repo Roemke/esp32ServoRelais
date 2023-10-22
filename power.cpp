@@ -86,3 +86,9 @@ char * Power::getJSON(const char * action)
   serializeJson(doc, output);
   return output;
 }
+char * Power::getString()
+{
+  static char out[96];
+  sprintf(out,"house: %d, bluePerc: %d, bluettiSolarIn: %d, deyeSolar: %d, blueOut: %d",house,bluettiPercent,bluettiIn,deyeInverter,blueInverter);
+  return out;
+}

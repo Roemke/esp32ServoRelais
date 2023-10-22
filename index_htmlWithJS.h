@@ -19,7 +19,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         border: 1px solid blue;
         padding: 1em;
         margin-top:  1em;
-        margin-left: 1em;
+        margin-bottom:  1em;
       }
       h1 {
         font-size: 135%%; /* im Template keine Prozentangababen moeglich :-), leistet template ein..., %% - yes */
@@ -54,18 +54,19 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
           #dManuell {
               display: grid;
               gap: 		0.5em  1em; /* row column */ 
-              grid-template-columns: auto auto auto auto auto auto auto auto ;   
+              grid-template-columns: auto auto auto auto auto auto auto auto ;   /* 8 spalten */
               justify-content: start;
               justify-items: stretch; /* in der spalte */   
               align-items: center; /* in der zeile */
             }
+            #dManuell  .haelfte {grid-column: auto / span 4;}
       }
 
       @media only screen and (max-width: 800px) { 
           #dManuell {
               display: grid;
               gap: 		0.5em  2em; /* row column */ 
-              grid-template-columns: auto auto auto auto auto auto ;   
+              grid-template-columns: auto auto auto auto auto auto ;   /* 6 Spalten */
               justify-content: start;
               justify-items: stretch; /* in der spalte */   
               align-items: center; /* in der zeile */
@@ -74,7 +75,9 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
               grid-column: 1 / -1 ; /* kleines Display, paragraphen über ganze Zeile */
               margin-top: 0em;
             }
-        #dManuell button {margin-bottom: 1em;}
+          #dManuell button {margin-bottom: 1em;}
+          #dManuell .haelfte {grid-column: auto / span 3;}
+
       }
       #dManuell * {
       	margin-top: 0em;
@@ -86,13 +89,13 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       	padding-top: 1em;
       	margin-bottom: 0.5em;
       }
-       .framed { 
-       border: 1px solid black; 
-       padding: 1em;
-      }
       #dManuell .span3 {
         grid-column: auto / span 3;
       }      
+      .framed { 
+       border: 1px solid black; 
+       padding: 1em;
+      }
       
       #controlContainer { /* hmm ein grid ist etwas übertrieben */
           display: grid;
@@ -253,7 +256,8 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
             switch (data.action)
             {
               case "message":
-                document.getElementById("iMessage").innerHTML += data.text + "<br>";
+                let tStamp = now.toLocaleDateString('en-CA') + " " + now.toLocaleTimeString('de-DE') + ": ";
+                document.getElementById("iMessage").innerHTML += tStamp + data.text + "<br>";
                 break;
               case "power": 
                 let vDateTime = document.getElementById("dateTime"); 
@@ -264,7 +268,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
                 let vBSolarP = document.getElementById("valSolarBluePower"); 
                 let vBDCP = document.getElementById("valBluePower");
                 let vBP = document.getElementById("valBluettiPercent");
-                
+  
                 vDateTime.innerHTML =  "(" + now.toLocaleDateString('en-CA') + 
                                        " " + now.toLocaleTimeString('de-DE') + ")";
                 
@@ -287,6 +291,8 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
                   document.getElementById('intervalAutoAdjust').value = data.intervalAutoAdjust;
                 if (document.activeElement.id != 'intervalAutoCharge')
                   document.getElementById('intervalAutoCharge').value = data.intervalAutoCharge;
+                if (document.activeElement.id != 'maxPowerBlue')
+                  document.getElementById('maxPowerBlue').value = data.maxPowerBlue;
                 data.values.forEach(  evaluateConfirm );//sollte ein Array sein, dieses abarbeiten
               break;
             } 
@@ -370,7 +376,10 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         {
             websocket.send(JSON.stringify({'action':'intervalAutoAdjust','value':evt.target.value}));
         });
-        
+        document.getElementById("maxPowerBlue").addEventListener("change",evt =>
+        {
+            websocket.send(JSON.stringify({'action':'maxPowerBlue','value':evt.target.value}));
+        });
         let fButtons = document.querySelectorAll("button");  //allen buttons hinzufügen
         fButtons.forEach( element => 
         {
@@ -431,14 +440,19 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
   	<p>Automatische Wahl der Solar-Einspeisung</p>
 		<button type="button" id="bAutoChargeOn"  >an </button>
 		<button type="button" id="bAutoChargeOff"  >aus </button>
-    <label>Min.: <input type="number" size=4 id="intervalAutoCharge" ></label>
+    <label>I: <input type="number" size=6 id="intervalAutoCharge" ></label>
 
   	<p>Automatisches Anpassen der Leistung der Bluetti </p>
 		<button type="button" id="bAutoAdjustBlueOn"  >an </button>
 		<button type="button" id="bAutoAdjustBlueOff"  >aus </button>
-    <label>Min.: <input type="number" size=4 id="intervalAutoAdjust"></label>
-    
-		<h3>Die folgenden Buttons sollten nicht / nur selten notwendig sein </h3>
+    <label>I: <input type="number" size=6 id="intervalAutoAdjust"></label>
+
+    <p class="haelfte">Maximale Einspeisung Blue:</p>
+    <label class="haelfte"><input type="number" size=6 id="maxPowerBlue"> in Watt</label>
+
+
+
+		<h3>Die folgenden Buttons sollten eher selten notwendig sein </h3>
 
 		<p>Bluetti DC Einspeisung</p>
 		<button class="span3" type="button" id="bBlueDCOn"  >an </button>
@@ -462,6 +476,11 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       <button id="bR4on"   type="button">R4 on</button>
       <button id="bR4off"  type="button">R4 off</button> 
     </form> -->
+    <div id='divNachrichten'>
+     Nachrichten <button id='bClear' type='button'>(clear)</button>: 
+     <p id="iMessage">
+     </p>
+    </div>
     <div class="framed">
     <h2>Erl&auml;uterungen</h2>
     <p>Zeigt den Zustand der Solar-Geschichten an und ermöglicht teilweise das Schalten. </p>
@@ -474,22 +493,15 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
     falls vorher nur die Bluetti geladen wurde.  
     </p>
     <p>BluettiOut anpassen versucht die Leistung der Bluetti an den Hausverbrauch anzupassen. Hier wird nicht zwischen Bluetti laden, beide Laden und nur Deye versorgen 
-    umgeschaltet, das ist (zunächst?) separat gehalten. Hier wird der Servo-Motor angesteuert.</p>
-    <p>Die Auto-Einstellungen haben ein Intervall, in dem Sie durchgeführt werden, Voreinstellung alle 5 Minuten. </p>
+    umgeschaltet, das ist (zunächst?) separat gehalten. Der  Servo-Motor wird angesteuert.</p>
+    <p>Die Auto-Einstellungen haben ein Intervall, in dem Sie durchgeführt werden, Voreinstellung alle 120 Sekunden. </p>
+    <p>Die maximale Leistung mit der die Bluetti einspeist kann eingestellt werden, da die Verluste bei höherer Leistung mehr als proportional anwachsen </p>
     <div class = "hinweis">Ein Update der Firmware / des Sketches kann &uuml;ber OTA erfolgen.
       <ol>
         <li>Bin-Datei erzeugen, in der IDE Sketch -> Kompilierte ... exportieren oder Strg Alt s </li>
-        <li>Upload der Firmware über %UPDATE_LINK% (findet sich im Sketchordner) </li>
+        <li>Upload der Firmware über %UPDATE_LINK% (findet sich im Sketchordner / Unterordner) </li>
       </ol>
-      Das sollte auch fuer das Dateisystem statt Firmware gehen, ist aber unnoetig, da ich mir damit die 
-      gespeicherten RFIDs loesche. Da sonst nichts dort liegt - egal. (Gibt wohl auch Probleme mit der Arduino-Ide das Dateisystem als bin 
-      zu erzeugen, wenn kein USB.
     </div>
-    </div>
-    <div id='divNachrichten'>
-     Nachrichten <button id='bClear' type='button'>(clear)</button>: 
-     <p id="iMessage">
-     </p>
     </div>
   </body></html>
 )rawliteral";

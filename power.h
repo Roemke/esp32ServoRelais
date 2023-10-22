@@ -20,6 +20,7 @@ class Power {
     int bluettiOut;         //aus bluetooth ab hier
     int bluettiIn;
     int bluettiPercent; 
+    int maxPowerBlue;
     bool bluettiDCState; 
 
     //Mittelwerte
@@ -49,10 +50,12 @@ class Power {
         eHouse = eBlueInverter = eDeyeInverter = eBluetti = true;
         bluettiDCState = false; 
         house = blueInverter = deyeInverter = bluettiOut = bluettiIn = bluettiPercent = 0;
+        maxPowerBlue = 100;
         http.useHTTP10(true); //use old http1.0 - stream is not chunked
       }
       void getByWebApi();
       char *getJSON(const char *action);
+      char *getString();
     
     private:
       HTTPClient http; 
