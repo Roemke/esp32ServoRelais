@@ -21,7 +21,8 @@ Bisher läuft
    ist nicht perfekt aber geht
  - alles auf github geschoben     
  - dieses gerät kann als mqtt in fhem eingebunden werden, es bekommt von fhem 
-   die daten gesendet, dies nur im mqtt branch, der seit ein paar Wochen nicht mehr weiter entwickelt wird. 
+   die daten gesendet, dies nur im mqtt branch, der seit ein paar Wochen nicht mehr weiter entwickelt wird.
+ - aber sende per mqtt um die Daten in fhem darstellen zu können und dort einen link auf das Webinterface zu ermöglichen 
  - umgestellt auf webapi der verschiedenen tasmota-devices, eine Steckdose am Deye-Inverter, eine Steckdose am Inverter, der über 12 Volt von der Bluetti versorgt wird, ein IR-Lesekopf mit 
    spezieller Tasmota-Version um den Stromzähler auszulesen
  
