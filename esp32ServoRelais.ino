@@ -81,6 +81,7 @@ const char *password = myPASSWORD;
 ObjectList <String> startmeldungen(16); //dient zum Puffern der Meldungen am Anfang
 
 Power power; //fuer die Werte die über Bluetooth, eigene Api-Calls entstehen, mqtt registrierung bei fhem nehme ich später mal raus 
+Preferences preferences;                        
 
 Servo servo;
 static const int servoPin = 15;//ist io15 = tdo
@@ -92,7 +93,7 @@ const int r3pin = 19;
 const int r4pin = 23;
 
 enum class ServoStatus {Left=105,Right=79,Stop=92} servoStatus;
-enum class LadeStatus  {DeyeOnly,BluettiOnly,BluettiDeye} ladeStatus;
+enum class LadeStatus  {DeyeOnly=0,BluettiOnly=1,BluettiDeye=2,initDeyeOnly=3,initBluettiOnly=4,initBluettiDeye=5} ladeStatus;
   
 long lastMsg = 0;
 bool adjustBluettiFlag = false;
@@ -161,7 +162,7 @@ void informClients()
     strcat(status,"\"deyeOnly\",");
 
 
-  (power.bluettiOut) ? strcat(status,"\"bluettiDCOn\",") : strcat(status,"\"bluettiDCOff\",");
+  (power.bluettiOutDC) ? strcat(status,"\"bluettiDCOn\",") : strcat(status,"\"bluettiDCOff\",");
   
   if (servoStatus == ServoStatus::Left)
     strcat(status,"\"servoLeft\","); 
@@ -219,12 +220,17 @@ void bleNotifyCallback(const char * topic , String value)
   }
   else if (!strcmp(topic, "dc_output_power"))
   {
-    power.bluettiOut = value.toInt();
+    power.bluettiOutDC = value.toInt();
+    power.eBluetti = false;
+  }
+  else if (!strcmp(topic, "ac_output_power"))
+  {
+    power.bluettiOutAC = value.toInt();
     power.eBluetti = false;
   }
 
   #ifdef DEBUG
-  sprintf(out,"Power: State: %d Percent %d out %d in %d",power.bluettiDCState, power.bluettiPercent,power.bluettiOut,power.bluettiIn);
+  sprintf(out,"Power: State: %d Percent %d out DC %d out AC %d in %d",power.bluettiDCState, power.bluettiPercent,power.bluettiOutDC,power.bluettiOutAC, power.bluettiIn);
   wsMsgSerial(out);
   #endif
 }
@@ -247,9 +253,14 @@ String processor(const String& var)
   String result = "";
  
   if (var == "UPDATE_LINK")
-  { 
     result = "<a href=\"http://" + WiFi.localIP().toString() +"/update\"> Update </a>";
-  }
+  else if (var == "bluettiDeye")
+    result = String((int) LadeStatus::BluettiDeye);
+  else if (var == "bluettiOnly")
+    result = String((int) LadeStatus::BluettiOnly);
+  else if (var == "deyeOnly")
+    result = String((int) LadeStatus::DeyeOnly);
+
   return result;
 }
 
@@ -286,14 +297,14 @@ void onWSEvent(AsyncWebSocket     *server,  //
 }
  
 //schalten, die confirmMessage wird gesendet
-void schalteLaden(const char * dest)
+void schalteLaden(LadeStatus dest)
 {
   static char out[256];
   strcpy(out,"{\"action\":\"confirm\",\"topic\":\"");
   int confirmLength = strlen(out);
   char confirmEnd[] = "\"}";
 
-  if ( !strcmp(dest,"bluettiOnly") && ladeStatus != LadeStatus::BluettiOnly) 
+  if ( dest == LadeStatus::BluettiOnly  && ladeStatus != LadeStatus::BluettiOnly || dest==LadeStatus::initBluettiOnly)
   {
     schalteRelais("bR3on"); //strange syntax has "historical" reasons :-) hatte erst Testaufbau
     schalteRelais("bR2on");
@@ -303,7 +314,7 @@ void schalteLaden(const char * dest)
     strcat(out,"bluettiOnly");
     wsMsgSerial("Schalte auf Bluetti Only");
   }
-  else if ( (!strcmp(dest,"deyeOnly") && ladeStatus != LadeStatus::DeyeOnly) || !strcmp(dest,"initialDeyeOnly"))
+  else if ( dest == LadeStatus::DeyeOnly  && ladeStatus != LadeStatus::DeyeOnly || dest==LadeStatus::initDeyeOnly) 
   {
     schalteRelais("bR1off");
     schalteRelais("bR2off");
@@ -313,7 +324,7 @@ void schalteLaden(const char * dest)
     strcat(out,"deyeOnly");
     wsMsgSerial("Schalte auf Deye Only");
   }
-  else if ( !strcmp(dest,"bluettiDeye") && ladeStatus != LadeStatus::BluettiDeye)
+  else if ( dest == LadeStatus::BluettiDeye  && ladeStatus != LadeStatus::BluettiDeye || dest==LadeStatus::initBluettiDeye)
   {
     schalteRelais("bR1off");
     schalteRelais("bR2off");
@@ -325,6 +336,7 @@ void schalteLaden(const char * dest)
   }
   if (strlen(out)!=confirmLength)
   {
+    preferences.putUInt ("ladeStatus",(uint) ladeStatus);
     strcat(out,confirmEnd);
     ws.textAll(out);
   }
@@ -410,7 +422,7 @@ void handleChargeSelect()
         solar = 2*power.deyeInverter;
     if ((solar < house  || house  > 400)&& power.deyeInverter > 10 ) //power deyeInverter dazu, denn falls er hängt wenigstens die Bluetti laden 
     {
-      schalteLaden("deyeOnly");
+      schalteLaden(LadeStatus::DeyeOnly);
       //adjustBluettiFlag = true; lassen wir
     }
     else 
@@ -419,15 +431,15 @@ void handleChargeSelect()
       {
         //lassen wir adjustBluettiFlag = true;
         if (house > power.maxPowerBlue * 1.5 )
-          schalteLaden("bluettiDeye");
+          schalteLaden(LadeStatus::BluettiDeye);
         else 
         {
-          schalteLaden("bluettiOnly"); //hmm, dann sollte aber die Ausgabe der Bluetti angepasst werden ?
+          schalteLaden(LadeStatus::BluettiOnly); //hmm, dann sollte aber die Ausgabe der Bluetti angepasst werden ?
           adjustBluettiFlag = true;
         }
       }
       else 
-        schalteLaden("deyeOnly");
+        schalteLaden(LadeStatus::DeyeOnly);
     }
   }
   chargeSelectFlag = false;
@@ -538,6 +550,11 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         strcat(out,"rebootESP");
         ESP.restart(); //Restart behält den Zustand des pins für die relais bei - den Servo auch?
       }
+      else if (strcmp(doc["action"],"setStandard")==0)
+      {
+        wsMsgSerial("Reset to Standard values");
+        resetStandardSettings();
+      }
       else if (!strcmp(doc["action"],"relais"))
       { //nicht mehr unabhängig schalten
         //schalteRelais( doc["value"]); //soll nicht mehr unabhängig möglich sein 
@@ -553,12 +570,14 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         {
           strcat(out,"adjustBluettiStop");
           adjustBluettiFlag = false; //hier flag setzen statt aufzurufen
-          autoAdjustBlue = false;
+          autoAdjustBlue = false; //anpassung stoppen, dann auch autoAdjust stoppen
+          preferences.putBool("autoAdjustBlue",autoAdjustBlue);
         }
       }
       else if (!strcmp(doc["action"],"changeCharge"))
       {
-        schalteLaden((const char *) doc["value"]);
+        LadeStatus dest = (LadeStatus) (uint) doc["value"];
+        schalteLaden(dest);
       }
       else if (!strcmp(doc["action"], "autoCharge"))
       {
@@ -571,7 +590,8 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         {
           autoCharge = false; 
           strcat(out,"autoChargeOff");
-        }         
+        }
+        preferences.putBool("autoCharge",autoCharge);         
       }
       else if (!strcmp(doc["action"], "autoAdjustBlue"))
       {
@@ -585,18 +605,22 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
           autoAdjustBlue = false; 
           strcat(out,"autoAdjustBlueOff");
         }         
+        preferences.putBool("autoAdjustBlue",autoAdjustBlue);
       }
       else if (!strcmp(doc["action"],"intervalAutoAdjust"))
       {
-        intervalAutoAdjust = doc["value"];
+        intervalAutoAdjust = (int) doc["value"];
+        preferences.putInt("intAutoAdjust",intervalAutoAdjust);
       }
       else if (!strcmp(doc["action"],"intervalAutoCharge"))
       {
-        intervalAutoCharge = doc["value"];
+        intervalAutoCharge = (int) doc["value"];
+        preferences.putInt("intAutoCharge",intervalAutoCharge);
       }
       else if (!strcmp(doc["action"],"maxPowerBlue"))
       {
         power.maxPowerBlue = doc["value"];
+        preferences.putInt("maxPowerBlue",power.maxPowerBlue);
       }
     }
     if (strlen(out)!=confirmLength)
@@ -648,6 +672,28 @@ void schalteRelais(const char * value) //muss const char * sein sonst meckert di
 }
 
 
+void resetStandardSettings()
+{
+  //stelle definierten Zustand her
+  //power nur auf deye (wenn ich weg bin und der Würfel ist nicht da, dann sollte das der Standard sein)
+  power.bluettiDCState = false;
+  preferences.putBool("bluettiDCState",power.bluettiDCState);
+  blue.switchOut((char *) "dc_output_on",(char *) "off");
+  servoStatus = ServoStatus::Stop;
+  servo.write((int) servoStatus); //stop
+  schalteLaden(LadeStatus::DeyeOnly); 
+  preferences.putUInt("ladeStatus", (uint) LadeStatus::DeyeOnly);
+  autoCharge =false;
+  preferences.putBool("autoCharge",autoCharge);
+  autoAdjustBlue = false; 
+  preferences.putBool("autoAdjustBlue",autoAdjustBlue);
+  power.maxPowerBlue = 100;
+  preferences.putInt("maxPowerBlue",power.maxPowerBlue );
+  intervalAutoAdjust = 120;
+  preferences.putInt("intAutoAdjust",intervalAutoAdjust );
+  intervalAutoCharge = 120;
+  preferences.putInt("intAutoCharge",intervalAutoCharge );
+}
 
               
 //--------------------------------------------------------------------
@@ -683,7 +729,8 @@ void setup() {
     startmeldungen.add(msg.c_str());
   }
 
-  
+
+
   //bluetti bluetooth
   blue.initBluetooth();
   
@@ -709,18 +756,19 @@ void setup() {
   //eine kleine Pause von 50ms.
   delay(50);
 
-  //stelle definierten Zustand her
-  //power nur auf deye (wenn ich weg bin und der Würfel ist nicht da, dann sollte das der Standard sein)
-  schalteLaden("initialDeyeOnly");//sendet confirm
-  //bluetti wird ausgeschaltet
-  power.bluettiDCState = false;
-  blue.switchOut((char *) "dc_output_on",(char *) "off");
-  servoStatus = ServoStatus::Stop;
+  //lade gespeicherte Daten // setze initiale Werte 
+  preferences.begin("settings",false); //"false heißt read/write"
+  power.bluettiDCState = preferences.getBool("bluettiDCState", false);
+  servoStatus = ServoStatus::Stop;              
   servo.write((int) servoStatus); //stop
-  autoCharge =false;
-  autoAdjustBlue = false; 
+  ladeStatus = (LadeStatus) preferences.getUInt("ladeStatus", (uint) LadeStatus::DeyeOnly);
+  schalteLaden((LadeStatus) ((int)ladeStatus + 3)); //+3 für init
+  autoCharge = preferences.getBool("autoCharge", false);
+  autoAdjustBlue = preferences.getBool("autoAdjustBlue", false);
+  power.maxPowerBlue  = preferences.getInt("maxPowerBlue",100);
+  intervalAutoAdjust  = preferences.getInt("intAutoAdjust",120);
+  intervalAutoCharge = preferences.getInt("intAutoCharge",120 );
   //informClients(); nein, in Startmeldungen, das reicht 
-
 }
 
 

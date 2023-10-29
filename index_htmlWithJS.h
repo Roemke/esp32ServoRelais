@@ -177,6 +177,10 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
             el = document.getElementById("bReboot");
             elReset = true;
           break;
+          case "setStandard":
+            el = document.getElementById("bStandard");
+            elReset = true;
+          break;
           case "adjustBluettiStart":
             el = document.getElementById("bAdjustBluetti");
             offList = ["bAdjustBluettiStop"];              			
@@ -266,7 +270,8 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
                 let vBIP = document.getElementById("valBlueInvPower");
 
                 let vBSolarP = document.getElementById("valSolarBluePower"); 
-                let vBDCP = document.getElementById("valBluePower");
+                let vBDCP = document.getElementById("valBluePowerDC");
+                let vBACP = document.getElementById("valBluePowerAC");
                 let vBP = document.getElementById("valBluettiPercent");
   
                 vDateTime.innerHTML =  "(" + now.toLocaleDateString('en-CA') + 
@@ -278,9 +283,10 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
                 vBIP.innerHTML = (!data.values.eBlueInverter) ? data.values.powerBlueInv + " W I." : '?';                                
                                  
                 vBSolarP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiIn + " W" : '?'; 
-                vBDCP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiOut + " W": '?'; 
+                vBDCP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiOutDC : '?'; 
+                vBACP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiOutAC +" W" : '? W'; 
                 vBP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiPercent + " %": "?" ;
-                //status anhand der Werte ablesen 
+                //status anhand der Werte ablesen
 
               break;
               case "confirm":
@@ -305,6 +311,10 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         document.getElementById('bReboot').addEventListener("click",() =>
         {
            websocket.send(JSON.stringify({'action':'rebootESP'}));
+        });
+        document.getElementById('bStandard').addEventListener("click",() =>
+        {
+           websocket.send(JSON.stringify({'action':'setStandard'}));
         });
         document.getElementById('bClear').addEventListener("click",() => 
         { 
@@ -342,15 +352,15 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         //Ladeverhalten, Relais schalten
         document.getElementById('bBluettiOnly').addEventListener("click",() => 
         { 
-            websocket.send(JSON.stringify({'action':'changeCharge','value':'bluettiOnly'}));
+            websocket.send(JSON.stringify({'action':'changeCharge','value':'%bluettiOnly%'}));
         });
         document.getElementById('bDeyeOnly').addEventListener("click",() => 
         { 
-            websocket.send(JSON.stringify({'action':'changeCharge','value':'deyeOnly'}));
+            websocket.send(JSON.stringify({'action':'changeCharge','value':'%deyeOnly%'}));
         });
         document.getElementById('bBluettiDeye').addEventListener("click",() => 
         { 
-            websocket.send(JSON.stringify({'action':'changeCharge','value':'bluettiDeye'}));
+            websocket.send(JSON.stringify({'action':'changeCharge','value':'%bluettiDeye%'}));
         });
         document.getElementById('bAutoChargeOn').addEventListener("click",() => 
         { 
@@ -410,7 +420,10 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
     <div id="dSticky"> 
       <div id='controlContainer'>
           <h1>Solar</h1>
+          <div>
           <button type="button" id="bReboot">reboot Esp</button>
+          <button type="button" id="bStandard">Standard</button>
+          </div>
       </div>
       <div class="framed" id="dInfo">
         <h2>Information <span id="dateTime">?</span></h2>
@@ -421,7 +434,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         <div>Blue State: <span id="valBluettiPercent">?</span></div>
         <div>Blue Solar: <span id="valSolarBluePower">?</span></div>
         <!-- neue Zeile -->
-        <div>Blue P: <span id="valBluePower">? </span></div>
+        <div>Blue P: <span id="valBluePowerDC">? </span>/<span id="valBluePowerAC">?</span></div>
         <div id="valBlueInvPower">?</div>
       </div>
     </div>
@@ -440,15 +453,15 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
   	<p>Automatische Wahl der Solar-Einspeisung</p>
 		<button type="button" id="bAutoChargeOn"  >an </button>
 		<button type="button" id="bAutoChargeOff"  >aus </button>
-    <label>I: <input type="number" size=6 id="intervalAutoCharge" ></label>
+    <label>I: <input type="number" size=6 id="intervalAutoCharge" >s</label>
 
   	<p>Automatisches Anpassen der Leistung der Bluetti </p>
 		<button type="button" id="bAutoAdjustBlueOn"  >an </button>
 		<button type="button" id="bAutoAdjustBlueOff"  >aus </button>
-    <label>I: <input type="number" size=6 id="intervalAutoAdjust"></label>
+    <label>I: <input type="number" size=6 id="intervalAutoAdjust">s</label>
 
     <p class="haelfte">Maximale Einspeisung Blue:</p>
-    <label class="haelfte"><input type="number" size=6 id="maxPowerBlue"> in Watt</label>
+    <label class="haelfte"><input type="number" size=6 id="maxPowerBlue"> W</label>
 
 
 

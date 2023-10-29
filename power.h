@@ -17,7 +17,8 @@ class Power {
     int house;           //aus webapi
     int blueInverter;    //aus webapi
     int deyeInverter;    //aus webapi
-    int bluettiOut;         //aus bluetooth ab hier
+    int bluettiOutDC;         //aus bluetooth ab hier
+    int bluettiOutAC;
     int bluettiIn;
     int bluettiPercent; 
     int maxPowerBlue;
@@ -49,7 +50,7 @@ class Power {
       {
         eHouse = eBlueInverter = eDeyeInverter = eBluetti = true;
         bluettiDCState = false; 
-        house = blueInverter = deyeInverter = bluettiOut = bluettiIn = bluettiPercent = 0;
+        house = blueInverter = deyeInverter = bluettiOutDC = bluettiOutAC = bluettiIn = bluettiPercent = 0;
         maxPowerBlue = 100;
         http.useHTTP10(true); //use old http1.0 - stream is not chunked
       }

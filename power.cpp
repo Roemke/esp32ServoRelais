@@ -65,7 +65,8 @@ char * Power::getJSON(const char * action)
   values["powerHouse"] = house;
   values["powerBlueInv"] = blueInverter;
   values["powerDeyeInv"] = deyeInverter;
-  values["bluettiOut"] = bluettiOut;
+  values["bluettiOutDC"] = bluettiOutDC;
+  values["bluettiOutAC"] = bluettiOutAC;
   values["bluettiIn"] = bluettiIn;
   values["bluettiPercent"] = bluettiPercent;
   if (!bluettiDCState)
