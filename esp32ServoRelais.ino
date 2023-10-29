@@ -249,6 +249,38 @@ void bleNotifyCallback(const char * topic , String value)
 Bluetti blue((char *) "AC200M2308002058882",bluettiCommand,bleNotifyCallback); //die bluetoothid, das command fuer das modell und der Callback 
 
 
+void reconnect() {
+  // Loop until we're reconnected
+  while (!mqttClient.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    // Attempt to connect
+    if (mqttClient.connect("ESP32Solar")) {
+      Serial.println("connected");
+      // Subscribe
+      mqttClient.subscribe("tele/DVES_17B73E/SENSOR");
+      mqttClient.subscribe("tele/DVES_352360/SENSOR");//power haus ist tasmota, das kann ich so abgreifen
+      mqttClient.subscribe("tele/DVES_9C2197/SENSOR");//alles andere an tasmota devices geht nicht, seltsam buffer problem
+      mqttClient.subscribe("tele/DVES_183607/SENSOR");
+      
+      /*
+       * Hmm, unter http://192.168.0.203:8083/fhem?detail=MQTT2_ESP32Solar und dann subscriptions ist auch nur das erste 
+       */
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(mqttClient.state());
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
+  }
+}
+void setupMQTT() 
+{
+  mqttClient.setBufferSize(1024);
+  mqttClient.setServer(mqttServer, mqttPort);
+  // set the callback function
+  mqttClient.setCallback(mqttCallback);
+}
 
 
 //------------------------------------------
@@ -740,7 +772,8 @@ void setup() {
     startmeldungen.add(msg.c_str());
   }
 
-
+  //mqtt aufsetzen 
+  setupMQTT();
 
   //bluetti bluetooth
   blue.initBluetooth();
@@ -791,6 +824,10 @@ void loop() {
     //power auslesen    
   }  
 
+  if (!mqttClient.connected()) {
+    reconnect();
+  }
+  mqttClient.loop();
   blue.handleBluetooth();
   handleAdjustBluetti();
   handleChargeSelect();

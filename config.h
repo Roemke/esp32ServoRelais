@@ -8,6 +8,7 @@
 
 //naja, habe mqtt ein wenig heraus genommen 
 
+
 #define DEVICE_NAME "BLUETTI-MQTT"
 #define BLUETTI_TYPE AC200M
 
