@@ -11,6 +11,7 @@ todo:
   - Asynch Webserver geht inzwischen woll besser, s. Warning
   - Servo hier nur in alter Version, neue braucht gnu++17 damit geht aber der esp nicht
   - NimBLE - Version 1.4.0 genutzt, 1.4.1 tut es nicht für mich, bekomme keine Antwort von der Bluetti
+  - bluetooth - evtl. doch reboot esp, inzwischen die settings in preferences gespeichert
 **/
 #include <WiFi.h>
 #include <ArduinoOTA.h>
@@ -20,6 +21,7 @@ todo:
 #include <AsyncElegantOTA.h>//mist, der braucht den ESPAsyncWebServer, habe mal in der Bibliothek angepasst, so dasss es auch mit ESPAsyncWebSrv.h geht
                               //und wieder zurück, nehme den AsyncWebServer Bibliothek manuell installiert aus zip
 #include <ArduinoJson.h> //ArduinoJson hat ein anderes Speicherkonzept als Arduino_Json
+#include <PubSubClient.h>
 #include <HTTPClient.h>
 
 #include <Servo.h>
@@ -81,6 +83,10 @@ const char *password = myPASSWORD;
 ObjectList <String> startmeldungen(16); //dient zum Puffern der Meldungen am Anfang
 
 Power power; //fuer die Werte die über Bluetooth, eigene Api-Calls entstehen, mqtt registrierung bei fhem nehme ich später mal raus 
+//nein, sende per mqtt wesentliche werte, nur frage ich keine mehr ab. in fhem hatte ich die subscriptions tele/DVES_17B73E/SENSOR tele/DVES_183607/SENSOR tele/DVES_352360/SENSOR tele/DVES_9C2197/SENSOR
+//dann kann ich diese Daten hier empfangen, sie sind aber jetzt unnötig, da die Abfrage über WebApi einfach schneller ist.
+//die alte Variante lässt sich noch im Branch mqttOLD nachlesen
+
 Preferences preferences;                        
 
 Servo servo;
@@ -118,7 +124,12 @@ unsigned long keepWebServerAlive = 0; //240000; //milliseconds also 4 Minuten, d
 unsigned long startTime;
 
 //---------------------------------------------
+//und fuer mqtt
+const char* mqttServer = mqttBROKER;
+const int mqttPort = 1883;
+
 WiFiClient wifiClient; //nicht ganz klar - ein Client der die Verbindung nutzen kann
+PubSubClient mqttClient(wifiClient); 
 
 //--------------------websocket kram 
 void wsMessage(const char *message,AsyncWebSocketClient * client = 0)
