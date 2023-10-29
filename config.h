@@ -6,7 +6,7 @@
 
 #define EEPROM_SALT 13374
 
-//naja, habe mqtt ein wenig heraus genommen 
+//mqttBROKER in credentials, naja
 
 
 #define DEVICE_NAME "BLUETTI-MQTT"

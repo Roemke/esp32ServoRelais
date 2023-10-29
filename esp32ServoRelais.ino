@@ -102,6 +102,7 @@ enum class ServoStatus {Left=105,Right=79,Stop=92} servoStatus;
 enum class LadeStatus  {DeyeOnly=0,BluettiOnly=1,BluettiDeye=2,initDeyeOnly=3,initBluettiOnly=4,initBluettiDeye=5} ladeStatus;
   
 long lastMsg = 0;
+long lastMQTTMsg = 0;
 bool adjustBluettiFlag = false;
 bool chargeSelectFlag = false;
 bool autoAdjustBlue = false;
@@ -124,9 +125,9 @@ unsigned long keepWebServerAlive = 0; //240000; //milliseconds also 4 Minuten, d
 unsigned long startTime;
 
 //---------------------------------------------
-//und fuer mqtt
+//und fuer mqtt (aus credentials)
 const char* mqttServer = mqttBROKER;
-const int mqttPort = 1883;
+const int mqttPort = mqttPORT ;
 
 WiFiClient wifiClient; //nicht ganz klar - ein Client der die Verbindung nutzen kann
 PubSubClient mqttClient(wifiClient); 
@@ -186,6 +187,39 @@ void informClients()
   (autoAdjustBlue) ? strcat(status,"\"autoAdjustBlueOn\"") : strcat(status,"\"autoAdjustBlueOff\"");  
   strcat(status,end);
   ws.textAll(status);
+}
+
+//wesentlich daten per mqtt versenden
+void mqttPublish()
+{
+  char status[16];
+  if (ladeStatus == LadeStatus::BluettiDeye)
+    mqttClient.publish("esp32solar/LadeStatus","BluettiDeye");
+  else if ( ladeStatus == LadeStatus::BluettiOnly )
+    mqttClient.publish("esp32solar/LadeStatus","BluettiOnly");
+  else if ( ladeStatus == LadeStatus::DeyeOnly )
+    mqttClient.publish("esp32solar/LadeStatus","DeyeOnly");
+  
+  sprintf(status,"%d",power.bluettiOutAC);
+  mqttClient.publish("esp32solar/BluettiOutAC",status);
+  sprintf(status,"%d",power.bluettiOutDC);
+  mqttClient.publish("esp32solar/BluettiOutDC",status);
+  sprintf(status,"%d",power.bluettiIn ); //Solar-Leistung
+  mqttClient.publish("esp32solar/BluettiInSolar",status);
+  sprintf(status,"%d",power.deyeInverter ); //Solar-Leistung
+  mqttClient.publish("esp32solar/DeyeSolar",status);
+  sprintf(status,"%d",power.bluettiPercent); 
+  mqttClient.publish("esp32solar/BluettiStatePercent",status);
+
+  sprintf(status,"%d",(power.deyeInverter + power.bluettiIn) ); //Solar-Leistung gesamt
+  mqttClient.publish("esp32solar/GesamtSolar",status);
+
+  sprintf(status,"%d",autoCharge );
+  mqttClient.publish("esp32solar/AutoSelectCharge",status);
+
+  sprintf(status,"%d",autoAdjustBlue );
+  mqttClient.publish("esp32solar/AutoAdjustBlue",status);
+
 }
 //alle daten, die am Anfang gesendet werden
 void sendAvailableData(AsyncWebSocketClient * client, AsyncWebSocket *server)
@@ -256,12 +290,13 @@ void reconnect() {
     // Attempt to connect
     if (mqttClient.connect("ESP32Solar")) {
       Serial.println("connected");
-      // Subscribe
+      // Subscribe - nein ist raus
+      /*
       mqttClient.subscribe("tele/DVES_17B73E/SENSOR");
       mqttClient.subscribe("tele/DVES_352360/SENSOR");//power haus ist tasmota, das kann ich so abgreifen
       mqttClient.subscribe("tele/DVES_9C2197/SENSOR");//alles andere an tasmota devices geht nicht, seltsam buffer problem
       mqttClient.subscribe("tele/DVES_183607/SENSOR");
-      
+      */
       /*
        * Hmm, unter http://192.168.0.203:8083/fhem?detail=MQTT2_ESP32Solar und dann subscriptions ist auch nur das erste 
        */
@@ -279,7 +314,7 @@ void setupMQTT()
   mqttClient.setBufferSize(1024);
   mqttClient.setServer(mqttServer, mqttPort);
   // set the callback function
-  mqttClient.setCallback(mqttCallback);
+  //mqttClient.setCallback(mqttCallback); //(noetig?)
 }
 
 
@@ -849,6 +884,10 @@ void loop() {
       ws.textAll("{\"action\":\"confirm\",\"topic\":\"bBlueDCOff\"}");
     }  
   } 
+  now = millis();
+  delta = now - lastMQTTMsg;
+  if (delta > 10000)// alle 10 s
+      mqttPublish(); 
   now = millis();
   delta = now -  lastBluettiAdjust ;
   if (delta > 1000 * intervalAutoAdjust && autoAdjustBlue )
