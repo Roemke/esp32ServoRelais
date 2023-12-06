@@ -22,6 +22,7 @@ class Power {
     int bluettiIn;
     int bluettiPercent; 
     int maxPowerBlue;
+    int minPercentBlue;
     bool bluettiDCState; 
 
     //Mittelwerte
@@ -52,6 +53,7 @@ class Power {
         bluettiDCState = false; 
         house = blueInverter = deyeInverter = bluettiOutDC = bluettiOutAC = bluettiIn = bluettiPercent = 0;
         maxPowerBlue = 100;
+        minPercentBlue = 20; 
         http.useHTTP10(true); //use old http1.0 - stream is not chunked
       }
       void getByWebApi();

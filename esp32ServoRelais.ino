@@ -163,7 +163,7 @@ void informClients()
 
   //und statusmeldungen als confirm senden, nein als status
   char status[384];
-  sprintf(status,"{\"action\":\"status\",\"intervalAutoAdjust\":%d,\"intervalAutoCharge\":%d,\"maxPowerBlue\":%d,",intervalAutoAdjust,intervalAutoCharge,power.maxPowerBlue);
+  sprintf(status,"{\"action\":\"status\",\"intervalAutoAdjust\":%d,\"intervalAutoCharge\":%d,\"maxPowerBlue\":%d,\"minPercentBlue\":%d,",intervalAutoAdjust,intervalAutoCharge,power.maxPowerBlue,power.minPercentBlue);
   strcat(status,"\"values\":[");
   char end[]="]}";
   if (ladeStatus == LadeStatus::BluettiDeye)
@@ -434,7 +434,7 @@ void handleAdjustBluetti()
     strcat(out,power.getString());
     wsMsgSerial(out);
 
-    if (!power.eBluetti && power.bluettiPercent > 10  )
+    if (!power.eBluetti && power.bluettiPercent > power.minPercentBlue  )
     {
       if (power.house > 0 && ! power.bluettiDCState  && power.blueInverter < 10 ) //power.blueInverter reagiert schneller als der bluetooth state
       {
@@ -444,7 +444,7 @@ void handleAdjustBluetti()
         blue.handleBluetooth();
         delay (2000);
       }
-      if (power.house > 20 && power.bluettiPercent > 10 && !power.eBluetti && power.blueInverter < 0.85 *power.maxPowerBlue) //faktor experimentell
+      if (power.house > 20 && power.bluettiPercent > power.minPercentBlue && !power.eBluetti && power.blueInverter < 0.85 *power.maxPowerBlue) //faktor experimentell
       {
         if (servoStatus != ServoStatus::Left)
         {
@@ -700,6 +700,11 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         power.maxPowerBlue = doc["value"];
         preferences.putInt("maxPowerBlue",power.maxPowerBlue);
       }
+      else if (!strcmp(doc["action"],"minPercentBlue"))
+      {
+        power.minPercentBlue = doc["value"];
+        preferences.putInt("minPercentBlue",power.minPercentBlue);
+      }
     }
     if (strlen(out)!=confirmLength)
     {
@@ -767,6 +772,8 @@ void resetStandardSettings()
   preferences.putBool("autoAdjustBlue",autoAdjustBlue);
   power.maxPowerBlue = 100;
   preferences.putInt("maxPowerBlue",power.maxPowerBlue );
+  power.minPercentBlue = 20;
+  preferences.putInt("minPercentBlue",power.minPercentBlue );
   intervalAutoAdjust = 120;
   preferences.putInt("intAutoAdjust",intervalAutoAdjust );
   intervalAutoCharge = 120;
@@ -845,6 +852,7 @@ void setup() {
   autoCharge = preferences.getBool("autoCharge", false);
   autoAdjustBlue = preferences.getBool("autoAdjustBlue", false);
   power.maxPowerBlue  = preferences.getInt("maxPowerBlue",100);
+  power.minPercentBlue  = preferences.getInt("minPercentBlue",20);
   intervalAutoAdjust  = preferences.getInt("intAutoAdjust",120);
   intervalAutoCharge = preferences.getInt("intAutoCharge",120 );
   //informClients(); nein, in Startmeldungen, das reicht 
@@ -877,7 +885,7 @@ void loop() {
     //Serial.println("try to publish esp32solar/state online");
     //ein paar checks 
     //immer: Falls zu niedrig - abschalten 
-    if (power.bluettiPercent <=10 && !power.eBluetti && power.bluettiDCState)
+    if (power.bluettiPercent <=power.minPercentBlue && !power.eBluetti && power.bluettiDCState)
     { //auf nummer sicher gehen
       wsMsgSerial("Bluetti Low, schalte ab");
       blue.switchOut((char *) "dc_output_on",(char *) "off");

@@ -23,7 +23,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       }
       h1 {
         font-size: 135%%; /* im Template keine Prozentangababen moeglich :-), leistet template ein..., %% - yes */
-        padding: 0em 1em;
+        padding: 0em 1em; /* seltsam im JavaScript habe ich Prozent drin, nein geht auch nicht*/
       }
       h2 {
         font-size: 110%%;
@@ -32,9 +32,18 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         /* border: 2px solid darkgreen; */
         padding: 2em;
       }
-      #dateTime {
+      h2 span{
         font-weight: normal;
       }
+      h2 button, #dInfoS button {
+          border: 0px solid grey;
+          width: 2em;
+          max-width: 2em;
+          min-width: 2em;
+          margin: 0em;
+          margin-left: 2em;
+      }
+      
       #dSticky {
           position: sticky;
           top: 0em;
@@ -44,8 +53,23 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         display: grid;
         gap: 		0.5em  2em; /* row column */ 
         grid-template-columns: auto auto;   
-        justify-content: start;     
+        justify-content: start;
+        align-items: center;     
       }
+      #dInfoS{
+        background: rgba(252, 252, 252, 0.95);
+        display: grid;
+        gap: 		0.5em  2em; /* row column */ 
+        grid-template-columns: auto auto auto;   
+        justify-content: start;
+        justify-items: stretch; /* in der spalte */
+        align-items: center; /*vertical*/   
+      }
+      #dInfo.displayNone, #dInfoS.displayNone {
+          display: none; 
+      }
+
+
       #dInfo h2 {
       	 grid-column: 1 / span 2;
       }
@@ -101,7 +125,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
           display: grid;
           background-color: #fafaff;
           /*  grid-template-rows: 20%% 20%% 20%% 20%% 20%% ; sowieso automatisch */
-           grid-template-columns: 80%%  20%%;
+           grid-template-columns: 50%%  50%%;
            grid-auto-flow: column;
            padding-bottom: 0em; 
            /*justify-items: center; */             
@@ -266,6 +290,8 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
               case "power": 
                 let vDateTime = document.getElementById("dateTime"); 
                 let vph = document.getElementById("valPowerHouse"); 
+                let vphS = document.getElementById("valPowerHouseS");
+                let vps  = document.getElementById("valSolar"); 
                 let vSDP = document.getElementById("valSolarDeyePower"); 
                 let vBIP = document.getElementById("valBlueInvPower");
 
@@ -279,13 +305,17 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
                 
 
                 vph.innerHTML = (!data.values.eHouse) ? data.values.powerHouse + " W " : '?'; 
+                vphS.innerHTML = (!data.values.eHouse) ? data.values.powerHouse + " W " : '?'; 
                 vSDP.innerHTML = (!data.values.eDeyeInverter) ? data.values.powerDeyeInv + " W I." : '?';
                 vBIP.innerHTML = (!data.values.eBlueInverter) ? data.values.powerBlueInv + " W I." : '?';                                
                                  
-                vBSolarP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiIn + " W" : '?'; 
+                vBSolarP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiIn + " W" : '?';
+                let solarTotal = parseFloat((!data.values.eBluetti) ? data.values.bluettiIn : 0) ;
+                solarTotal += parseFloat((!data.values.eDeyeInverter) ? data.values.powerDeyeInv : 0);
+                vps.innerHTML = solarTotal + " W"; 
                 vBDCP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiOutDC : '?'; 
                 vBACP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiOutAC +" W" : '? W'; 
-                vBP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiPercent + " %": "?" ;
+                vBP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiPercent + " %%": "?" ;
                 //status anhand der Werte ablesen
 
               break;
@@ -299,6 +329,8 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
                   document.getElementById('intervalAutoCharge').value = data.intervalAutoCharge;
                 if (document.activeElement.id != 'maxPowerBlue')
                   document.getElementById('maxPowerBlue').value = data.maxPowerBlue;
+                if (document.activeElement.id != 'minPercentBlue')
+                  document.getElementById('minPercentBlue').value = data.minPercentBlue;
                 data.values.forEach(  evaluateConfirm );//sollte ein Array sein, dieses abarbeiten
               break;
             } 
@@ -390,6 +422,10 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         {
             websocket.send(JSON.stringify({'action':'maxPowerBlue','value':evt.target.value}));
         });
+        document.getElementById("minPercentBlue").addEventListener("change",evt =>
+        {
+            websocket.send(JSON.stringify({'action':'minPercentBlue','value':evt.target.value}));
+        });
         let fButtons = document.querySelectorAll("button");  //allen buttons hinzufügen
         fButtons.forEach( element => 
         {
@@ -400,7 +436,17 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
              evt.target.classList.add("oneTouch");
              setTimeout( () =>  evt.target.classList.remove("oneTouch"),500);
            });
-        });        
+        });  
+        document.getElementById("bHideInfo").addEventListener("click", evt =>
+        {
+          document.getElementById("dInfo").classList.toggle("displayNone");
+          document.getElementById("dInfoS").classList.toggle("displayNone");
+        });      
+        document.getElementById("bHideInfoS").addEventListener("click", evt =>
+        {
+          document.getElementById("dInfo").classList.toggle("displayNone");
+          document.getElementById("dInfoS").classList.toggle("displayNone");
+        });      
         //--------------
         //die relais testen -> buttons im form, im Betrieb nicht sinnvoll, die Relais dürfen nicht unabhängig geschaltet werden !
         /*
@@ -425,12 +471,18 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
           <button type="button" id="bStandard">Standard</button>
           </div>
       </div>
+      <div id = "dInfoS" class="framed displayNone" >
+        <div>P. Haus: <span id="valPowerHouseS">?</span></div>
+        <div>P. Solar: <span id="valSolar">?</span></div>
+        <button id="bHideInfoS">&oplus;</button>
+      </div>
       <div class="framed" id="dInfo">
-        <h2>Information <span id="dateTime">?</span></h2>
+        <h2>Information <span id="dateTime">?</span><span><button id="bHideInfo">&otimes;</button></span></h2>
         <!-- neue Zeile -->
         <div>P. Haus: <span id="valPowerHouse">?</span></div>
         <div>Deye Solar: <span id="valSolarDeyePower">?</span></div>
         <!-- neue Zeile -->
+
         <div>Blue State: <span id="valBluettiPercent">?</span></div>
         <div>Blue Solar: <span id="valSolarBluePower">?</span></div>
         <!-- neue Zeile -->
@@ -462,10 +514,12 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
 
     <p class="haelfte">Maximale Einspeisung Blue:</p>
     <label class="haelfte"><input type="number" size=6 id="maxPowerBlue"> W</label>
+    <p class="haelfte">Minimal Status Blue:</p>
+    <label class="haelfte"><input type="number" size=6 id="minPercentBlue"> %%</label>
 
 
 
-		<h3>Die folgenden Buttons sollten eher selten notwendig sein </h3>
+		<h3>Details</h3>
 
 		<p>Bluetti DC Einspeisung</p>
 		<button class="span3" type="button" id="bBlueDCOn"  >an </button>
