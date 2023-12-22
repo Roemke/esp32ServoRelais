@@ -895,7 +895,10 @@ void loop() {
   now = millis();
   delta = now - lastMQTTMsg;
   if (delta > 10000)// alle 10 s
+  {
       mqttPublish(); 
+      lastMQTTMsg = now;
+  }
   now = millis();
   delta = now -  lastBluettiAdjust ;
   if (delta > 1000 * intervalAutoAdjust && autoAdjustBlue )
