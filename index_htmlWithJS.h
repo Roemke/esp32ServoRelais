@@ -287,6 +287,9 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
                 let tStamp = now.toLocaleDateString('en-CA') + " " + now.toLocaleTimeString('de-DE') + ": ";
                 document.getElementById("iMessage").innerHTML += tStamp + data.text + "<br>";
                 break;
+              case "messageNLB":
+                document.getElementById("iMessage").innerHTML += data.text 
+                break;  
               case "power": 
                 let vDateTime = document.getElementById("dateTime"); 
                 let vph = document.getElementById("valPowerHouse"); 

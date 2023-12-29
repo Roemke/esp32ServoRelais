@@ -148,12 +148,35 @@ void wsMessage(const char *message,AsyncWebSocketClient * client = 0)
     
   delete [] str;
 }
+void wsMessageNLB(const char *message,AsyncWebSocketClient * client = 0)
+{ 
+  const char * begin = "{\"action\":\"messageNLB\",\"text\":\"";
+  const char * end = "\"}";
+  char * str = new char[strlen(message)+strlen(begin)+strlen(end)+24];//Puffer +24 statt +1 :-)
+  strcpy(str,begin);
+  strcat(str,message);
+  strcat(str,end);
+  if (!client)
+    ws.textAll(str);
+  else
+    client->text(str);    
+  delete [] str;
+}
+
+
 
 void wsMsgSerial(const char *message, AsyncWebSocketClient * client = 0)
 {
   wsMessage(message,client);
   Serial.println(message);
 }
+
+void wsMsgSerialNLB(const char *message, AsyncWebSocketClient * client = 0) //No line break
+{
+  wsMessageNLB(message,client);
+  Serial.print(message);
+}
+
 
 //daten aus dem Power-Objekt an die Clients senden
 void informClients()
@@ -422,18 +445,28 @@ void schalteLaden(LadeStatus dest)
 //Falls Zustand ok die Bluetti einschalten 
 /*
   Die Funktion ist noch nicht ok, hatte delays zum Testen eingebaut, wird sie ohne ausgeführt, dann bekomme ich einen Absturz
-  des ESP - noch unklar
+  des ESP - noch unklar, noe muesste inzwischen ok sein 
   So geht erhöhen der Leistung, verringern nicht, da keine Sonne mehr :-)
 */
 void handleAdjustBluetti()
 {
   static char out[256];
+  static bool firstCall = true;
   if (adjustBluettiFlag)
   {
-    strcpy(out,"check blue adjust- ");
-    strcat(out,power.getString());
-    wsMsgSerial(out);
-
+    if (firstCall)
+    {
+      strcpy(out,"check blue adjust - "); //erst dann ausgabe, kommt sonst zu oft, da kein Delay da ist
+          //      012345678901234567890 
+      strcat(out,power.getString());
+      wsMsgSerial(out);
+      firstCall = false;
+    }
+    else 
+    {
+      sprintf(out,"(%d)",power.blueInverter); //Blueinverter ist die aktuelle Leistung 
+      wsMsgSerialNLB(out);
+    }
     if (!power.eBluetti && power.bluettiPercent > power.minPercentBlue  )
     {
       if (power.house > 0 && ! power.bluettiDCState  && power.blueInverter < 10 ) //power.blueInverter reagiert schneller als der bluetooth state
@@ -452,6 +485,7 @@ void handleAdjustBluetti()
           servo.write((int) servoStatus);
         }
         //wsMsgSerial("Hausverbrauch > 0, bleibe beim Erhöhen der Bluetti ");
+        wsMsgSerialNLB("(+)");
         delay (100);
       } 
       else if (power.house < -10 && power.blueInverter>38 || power.blueInverter > power.maxPowerBlue) //kleiner als 34 klappt nicht
@@ -462,6 +496,7 @@ void handleAdjustBluetti()
           servo.write((int) servoStatus);
         }
         //wsMsgSerial("Hausverbrauch <0 oder input inverter zu hoch , bleibe beim Verringern der Bluetti");
+        wsMsgSerialNLB("(-)");
         delay (100);
         if (power.house < -35 && power.bluettiDCState && power.blueInverter > 20) //power.blueInverter reagiert schneller als der bluetooth state
         {
@@ -470,6 +505,7 @@ void handleAdjustBluetti()
           servoStatus = ServoStatus::Stop;
           servo.write((int) servoStatus);
           adjustBluettiFlag = false;
+          firstCall = false;
           ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluettiDone\"}");
         }
       }
@@ -479,10 +515,12 @@ void handleAdjustBluetti()
           servo.write((int) servoStatus);
           adjustBluettiFlag = false;
           wsMsgSerial("adjust Blue done");
+          firstCall = false;
           ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluettiDone\"}");
           delay (100);
       }
     }
+
   }
 }
 
