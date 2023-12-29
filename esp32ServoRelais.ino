@@ -531,9 +531,17 @@ void handleChargeSelect()
   {
     int solar = power.bluettiIn + power.deyeInverter;
     int house = power.house + power.deyeInverter + power.blueInverter;
-    sprintf(out,"check autoCharge, house %d, solar %d and ",house, solar);
-    strcat(out,power.getString());
-    wsMsgSerial(out);
+    if (power.house > 0) //normaler check 
+    {
+      sprintf(out,"check autoCharge, house %d, solar %d and ",house, solar);
+      strcat(out,power.getString());
+      wsMsgSerial(out);
+    }
+    else //wird ggf. recht oft gerufen
+    {
+      sprintf(out,"(%d)",power.house);
+      wsMsgSerialNLB(out);
+    }
     if (power.eBluetti && ladeStatus == LadeStatus::BluettiDeye ) //fehler bluetooth  
         solar = 2*power.deyeInverter;
     if ((solar < house  || house  > 400)&& power.deyeInverter > 10 ) //power deyeInverter dazu, denn falls er hängt wenigstens die Bluetti laden 
