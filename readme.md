@@ -1,6 +1,8 @@
 Projekt aus meinem RFID-Relais Projekt kopiert - da ich es immer vergesse bzw. Arduino Ide immer die Einstellungen
 des aktuellen Projektes behält, statt sie pro Projekt zu speichern:
 verwende D1 Mini ESP32 und Partion Minimal SPIFFS (Large Apps with OTA) 
+außerdem hier jetzt esp32v3 - einige Aenderungen in ESPAsyncWebserver und
+Servo noetig
 
 Ziel: 
  - Servo steuern (poti fuer den Inverter am Bluetti drehen)
@@ -111,3 +113,4 @@ so 5 - 10 Minuten scheinen normal zu sein eigentlich müsste das aber doch norma
 
 Todo: Warning AsynchTCP nicht verwenden o.ä. anscheinend unterstützen auch die normalen Libraries jetzt asynd, nicht weiter geschaut. 
 
+readmeEsp32V3.txt - versehentliches upgrade auf es32v3 - Fazit: das ist 2024 zu frueh
