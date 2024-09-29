@@ -1,6 +1,9 @@
 Projekt aus meinem RFID-Relais Projekt kopiert - da ich es immer vergesse bzw. Arduino Ide immer die Einstellungen
 des aktuellen Projektes behält, statt sie pro Projekt zu speichern:
 verwende D1 Mini ESP32 und Partion Minimal SPIFFS (Large Apps with OTA) 
+außerdem hier jetzt esp32v3 - einige Aenderungen in ESPAsyncWebserver und
+Servo noetig - nein hat nicht geklappt :-) siehe eigene readme
+
 
 Ziel: 
  - Servo steuern (poti fuer den Inverter am Bluetti drehen)

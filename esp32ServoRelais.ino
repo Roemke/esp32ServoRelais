@@ -1,4 +1,3 @@
-
 /*
 Information über und Steuerung der kleinen Solaranlage zu Hause. 
 zwei Panels a 420 W, ein Deye-Inverter, ein Bluetti Würfel
@@ -13,6 +12,7 @@ todo:
   - NimBLE - Version 1.4.0 genutzt, 1.4.1 tut es nicht für mich, bekomme keine Antwort von der Bluetti
   - bluetooth - evtl. doch reboot esp, inzwischen die settings in preferences gespeichert
 **/
+#define ESP32 1
 #include <WiFi.h>
 #include <ArduinoOTA.h>
 #include <Preferences.h>        
@@ -99,14 +99,15 @@ const int r3pin = 19;
 const int r4pin = 23;
 
 enum class ServoStatus {Left=105,Right=79,Stop=92} servoStatus;
+//left ist Leistung erhöhen, right verringern
 enum class LadeStatus  {DeyeOnly=0,BluettiOnly=1,BluettiDeye=2,initDeyeOnly=3,initBluettiOnly=4,initBluettiDeye=5} ladeStatus;
   
 long lastMsg = 0;
 long lastMQTTMsg = 0;
-bool adjustBluettiFlag = false;
-bool chargeSelectFlag = false;
-bool autoAdjustBlue = false;
-bool autoCharge = false;
+bool adjustBluettiFlag = false;  //Leistung der Bluetti anzupassen
+bool chargeSelectFlag = false;  //Ziel der Solareinspeisung anpassen 
+bool autoAdjustBlue = false;   //Automatische Anpassung der Leistung der Bluetti
+bool autoCharge = false;      //Automatische Wahl der Solareinspeisung
 
 int intervalAutoAdjust = 120;
 int intervalAutoCharge = 120;
@@ -446,7 +447,9 @@ void schalteLaden(LadeStatus dest)
 /*
   Die Funktion ist noch nicht ok, hatte delays zum Testen eingebaut, wird sie ohne ausgeführt, dann bekomme ich einen Absturz
   des ESP - noch unklar, noe muesste inzwischen ok sein 
-  So geht erhöhen der Leistung, verringern nicht, da keine Sonne mehr :-)
+  dennoch delays? 
+  Problem: manchmal ist das System bei einer Leistung von 200 Watt gewesen, obwohl max meist auf ca 100 steht. 
+           vermute das es am ausschalten liegt und dann der Servo auf erhöhen gesetzt wird?
 */
 void handleAdjustBluetti()
 {
@@ -477,27 +480,27 @@ void handleAdjustBluetti()
         blue.handleBluetooth();
         delay (2000);
       }
-      if (power.house > 20 && power.bluettiPercent > power.minPercentBlue && !power.eBluetti && power.blueInverter < 0.85 *power.maxPowerBlue) //faktor experimentell
-      {
+      if (power.house > 20 && power.bluettiPercent > power.minPercentBlue && !power.eBluetti && power.blueInverter > 10 && power.blueInverter < 0.85 *power.maxPowerBlue) //faktor experimentell
+      {//nehme fuer das erhöhen mal die power des Inverters dazu
         if (servoStatus != ServoStatus::Left)
         {
-          servoStatus = ServoStatus::Left;
+          servoStatus = ServoStatus::Left; //erhoehen
           servo.write((int) servoStatus);
         }
         //wsMsgSerial("Hausverbrauch > 0, bleibe beim Erhöhen der Bluetti ");
         wsMsgSerialNLB("(+)");
-        delay (100);
+        delay (1000);
       } 
       else if (power.house < -10 && power.blueInverter>38 || power.blueInverter > power.maxPowerBlue) //kleiner als 34 klappt nicht
       {
-        if (servoStatus != ServoStatus::Right)
+        if (servoStatus != ServoStatus::Right) //verringern
         {
           servoStatus = ServoStatus::Right;
           servo.write((int) servoStatus);
         }
         //wsMsgSerial("Hausverbrauch <0 oder input inverter zu hoch , bleibe beim Verringern der Bluetti");
         wsMsgSerialNLB("(-)");
-        delay (100);
+        delay (1000);
         if (power.house < -35 && power.bluettiDCState && power.blueInverter > 20) //power.blueInverter reagiert schneller als der bluetooth state
         {
           blue.switchOut((char *) "dc_output_on",(char *) "off");
@@ -507,6 +510,8 @@ void handleAdjustBluetti()
           adjustBluettiFlag = false;
           firstCall = false;
           ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluettiDone\"}");
+          blue.handleBluetooth();
+          delay (2000);
         }
       }
       else // abschalten servo
@@ -520,7 +525,8 @@ void handleAdjustBluetti()
           delay (100);
       }
     }
-
+    else
+          adjustBluettiFlag = false; //wenn die bluetti kleiner als min hat, dann muss gar nichts getan werden
   }
 }
 
@@ -551,19 +557,24 @@ void handleChargeSelect()
     }
     else 
     {
-      if (power.bluettiPercent <= 95)
-      {
+      //schalte nur noch auf beide um, da das deye-teil ewig braucht, bis es wieder zum leben erwacht
+      if (power.bluettiPercent <= 99)
+        schalteLaden(LadeStatus::BluettiDeye);
+      /*
+      if (power.bluettiPercent <= 99)
+      {        
         //lassen wir adjustBluettiFlag = true;
         if (house > power.maxPowerBlue * 1.5 )
           schalteLaden(LadeStatus::BluettiDeye);
         else 
         {
           schalteLaden(LadeStatus::BluettiOnly); //hmm, dann sollte aber die Ausgabe der Bluetti angepasst werden ?
-          adjustBluettiFlag = true;
+          adjustBluettiFlag = true; nein
         }
       }
       else 
         schalteLaden(LadeStatus::DeyeOnly);
+      */
     }
   }
   chargeSelectFlag = false;
@@ -599,14 +610,6 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
     }
     else
     {
-      /*
-      if(strcmp(doc["action"],"clearNew") == 0) //:-) gibts gar nicht mehr 
-      {
-        //rfidsNew.clear();
-        strcat(out,"clearNew");
-        ws.textAll("{\"action\":\"clearNew\"}");
-        wsMsgSerial("Neu gelesene geloescht");
-      }*/
       if (strcmp(doc["action"],"dc_output") ==0)
       {
           //String state =  (const char *) doc["value"];
@@ -641,8 +644,8 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       {
             //wsMsgSerial(buffer);
             
-            if (power.bluettiDCState && !power.eBluetti) //nur wenn Bluetti auch an ist
-            {
+            //if (power.bluettiDCState && !power.eBluetti) //nur wenn Bluetti auch an ist
+            { //zum test heraus
               if (!strcmp(doc["value"],"left"))
               { 
                 servoStatus = ServoStatus::Left;
@@ -659,11 +662,13 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
                 servoStatus = ServoStatus::Stop;
               }  
             }
+            /*
             else 
             { 
               strcat(out,"servoStop");
               servoStatus = ServoStatus::Stop;
-            }  
+            } 
+            */ 
             servo.write((int) servoStatus);    
       }
       else if (strcmp(doc["action"],"rebootESP")==0)
@@ -703,11 +708,11 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         LadeStatus dest = (LadeStatus) (uint) doc["value"];
         schalteLaden(dest);
       }
-      else if (!strcmp(doc["action"], "autoCharge"))
+      else if (!strcmp(doc["action"], "autoCharge")) //automatische Anpassung solareinspeisung
       {
         if (!strcmp((const char * )doc["value"],"on"))
         {
-          autoCharge = true; //schon mal setzen, auch wenn es noch nicht stimmt
+          autoCharge = true; //schon mal setzen, auch wenn es noch nicht stimmt, was meinte ich damit :-)
           strcat(out,"autoChargeOn");
         }
         else 
@@ -750,6 +755,10 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       {
         power.minPercentBlue = doc["value"];
         preferences.putInt("minPercentBlue",power.minPercentBlue);
+      }
+      else if (!strcmp(doc["action"],"status"))
+      {
+
       }
     }
     if (strlen(out)!=confirmLength)
@@ -952,9 +961,13 @@ void loop() {
     lastBluettiAdjust = now;
     adjustBluettiFlag = true;
   }
+  /*
   else if (power.house < -30 && power.blueInverter > 20) //zu starke bluetti einspeisung auf jeden Fall anpassen
-      adjustBluettiFlag = true;
+  {
+    //    adjustBluettiFlag = true; //Nein, denn dann bleibt es in dem Zustand und ich kann es nicht mehr sinnvoll steuern
 
+  } 
+  */
   
 
   delta = now -  lastAutoCharge ;
@@ -963,7 +976,8 @@ void loop() {
     lastAutoCharge = millis();
     chargeSelectFlag = true;
   }
+  /*
   else if (power.house < -30 && autoCharge)
     chargeSelectFlag = true;
- 
+  */
 }
