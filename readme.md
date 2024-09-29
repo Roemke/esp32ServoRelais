@@ -114,3 +114,4 @@ so 5 - 10 Minuten scheinen normal zu sein eigentlich müsste das aber doch norma
 
 Todo: Warning AsynchTCP nicht verwenden o.ä. anscheinend unterstützen auch die normalen Libraries jetzt asynd, nicht weiter geschaut. 
 
+readmeEsp32V3.txt - versehentliches upgrade auf es32v3 - Fazit: das ist 2024 zu frueh

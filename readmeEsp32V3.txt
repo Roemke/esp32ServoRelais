@@ -23,5 +23,6 @@ so muesste es doch gehen
 #endif
 passe Servo.cpp analog an
 
-kompilieren wieder möglich
-und es läuft auch 
+kompilieren wieder möglich, ok, der Servo wird auch wieder angesteuert
+
+
