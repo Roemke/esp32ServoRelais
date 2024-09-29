@@ -11,6 +11,7 @@ todo:
   - Servo hier nur in alter Version, neue braucht gnu++17 damit geht aber der esp nicht
   - NimBLE - Version 1.4.0 genutzt, 1.4.1 tut es nicht für mich, bekomme keine Antwort von der Bluetti
   - bluetooth - evtl. doch reboot esp, inzwischen die settings in preferences gespeichert
+  - habe ein wenig ueberarbeitet, merge-conflict erzeugt, aber geloest, sollte der neueste Stand sein.
 **/
 #define ESP32 1
 #include <WiFi.h>
