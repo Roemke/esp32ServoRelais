@@ -17,7 +17,7 @@ void Power::getByWebApi()
     else
     {
       eHouse = false;
-      JsonObject PO = doc["StatusSNS"]["Power"];
+      JsonObject PO = doc["StatusSNS"]["SML"]; //aenderung auf SML (von Power), da Script auf dem ESP an Power geändert
       house = PO["Power_curr"]; // 134 
     }
     http.end();
