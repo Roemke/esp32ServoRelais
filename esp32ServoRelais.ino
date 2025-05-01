@@ -875,6 +875,9 @@ void setup() {
 
   //bluetti bluetooth
   blue.initBluetooth();
+
+  //power muss modbus initialisieren
+  power.beginModBus();
   
   //Der Rest sind doch nur callbacks und der WebSocket-Server sollte gehen 
   server.onNotFound(notFound);
@@ -936,7 +939,7 @@ void loop() {
   if (delta > 2000) //alle 2 Sekunden Information heraus und auf jeden Fall Bluetti adjust wenn power house < -50 
   {
     lastMsg = now;
-    power.getByWebApi();
+    power.actualizeData();
     informClients(); //
     //Serial.println("try to publish esp32solar/state online");
     //ein paar checks 

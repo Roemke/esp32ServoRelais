@@ -1,6 +1,7 @@
 #ifndef POWER_H
 #define POWER_H
 #include "config.h"
+#include <ModbusIP_ESP8266.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h> //ArduinoJson hat ein anderes Speicherkonzept als Arduino_Json
 
@@ -17,6 +18,14 @@ class Power {
     int house;           //aus webapi
     int blueInverter;    //aus webapi
     int deyeInverter;    //aus webapi
+    
+    //daten des Wechselrichters
+    int seHouse; 
+    int seBattery;   
+    int seGrid; //Stromnetz 
+    int seSun;
+
+
     int bluettiOutDC;         //aus bluetooth ab hier
     int bluettiOutAC;
     int bluettiIn;
@@ -25,6 +34,7 @@ class Power {
     int minPercentBlue;
     bool bluettiDCState; 
 
+    
     //Mittelwerte
     /* das ist noch nicht durchdacht, weiss nicht, ob ich das möchte  
     int mHouse;           
@@ -53,17 +63,28 @@ class Power {
         bluettiDCState = false; 
         house = blueInverter = deyeInverter = bluettiOutDC = bluettiOutAC = bluettiIn = bluettiPercent = 0;
         maxPowerBlue = 100;
-        minPercentBlue = 20; 
+        minPercentBlue = 20;
+        seHouse = seGrid = seSun = seBattery = 0; 
         http.useHTTP10(true); //use old http1.0 - stream is not chunked
       }
-      void getByWebApi();
+      void actualizeData();
+      void beginModBus();
+
       char *getJSON(const char *action);
       char *getString();
-    
+
     private:
       HTTPClient http; 
+      //Verwendung von modbus tcp, um den SolarEdge Inverter abzufragen
+      ModbusIP mb;                   // Modbus-Objekt als Mitglied
+      IPAddress inverterIP = IPAddress(192, 168, 0, 205); // Fest zugewiesene IP
+      uint16_t port = 1502;             // Port, normal 502
+      uint16_t slaveID = 1;            // Modbus-ID    - egal?
+
       //standard-Tasmotasteckdose
       void readTasmotaSteckdose(const char *getString, int &power, bool &err);
+      
+      void readFromInverter();
            
 };
 #endif

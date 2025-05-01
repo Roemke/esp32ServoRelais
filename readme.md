@@ -4,6 +4,13 @@ verwende D1 Mini ESP32 und Partion Minimal SPIFFS (Large Apps with OTA)
 außerdem hier jetzt esp32v3 - einige Aenderungen in ESPAsyncWebserver und
 Servo noetig - nein hat nicht geklappt :-) siehe eigene readme
 
+Hinweis: seit Ende 2024 sind solarzellen auf dem Dach, daher das Verzeichnis 
+kopiert, ich kann die Steuerung jetzt nicht mehr am Hausverbrauch
+festmachen, da die Photovoltaik immer versucht das System auf 0 verbrauch zu
+bringen. Daher den branch masterModbus gewählt (modbus ist eine Möglichkeit 
+den Wechselrichter lokal abzufragen, der zugehörige server läuft auf einem 
+Raspberry pi und wird über einen Port angesprochen, dort liefert er json 
+daten  kleines python Programm)
 
 Ziel: 
  - Servo steuern (poti fuer den Inverter am Bluetti drehen)

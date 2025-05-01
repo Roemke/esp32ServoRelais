@@ -1,30 +1,37 @@
 #include "power.h"    
 
-void Power::getByWebApi()
+void Power::beginModBus()
+{
+  mb.begin();
+}
+void Power::actualizeData()
 {
   http.begin(powerHouseGet);
   http.GET();
-    //{"StatusSNS":{"Time":"2023-10-10T11:49:16","Power":{"Power_curr":-6,"Total_in":3670.2250,"Total_out":85.5679,"Meter_Number":"0a014954520003504c4c"}}}
-    //man koennte noch filtern
-    StaticJsonDocument<256> doc; //groesse mit dem assistant ermittelt, doc sollte nur einmal verwendet werden 
-    DeserializationError error = deserializeJson(doc, http.getStream());
-    if (error) 
-    {
-       Serial.printf("deserializeJson() of %s failed: ",powerHouseGet);
-       Serial.println(error.c_str());
-       eHouse = true; 
-    }
-    else
-    {
-      eHouse = false;
-      JsonObject PO = doc["StatusSNS"]["SML"]; //aenderung auf SML (von Power), da Script auf dem ESP an Power geändert
-      house = PO["Power_curr"]; // 134 
-    }
-    http.end();
+  //{"StatusSNS":{"Time":"2023-10-10T11:49:16","Power":{"Power_curr":-6,"Total_in":3670.2250,"Total_out":85.5679,"Meter_Number":"0a014954520003504c4c"}}}
+  //man koennte noch filtern
+  StaticJsonDocument<256> doc; //groesse mit dem assistant ermittelt, doc sollte nur einmal verwendet werden 
+  DeserializationError error = deserializeJson(doc, http.getStream());
+  if (error) 
+  {
+      Serial.printf("deserializeJson() of %s failed: ",powerHouseGet);
+      Serial.println(error.c_str());
+      eHouse = true; 
+  }
+  else
+  {
+    eHouse = false;
+    JsonObject PO = doc["StatusSNS"]["SML"]; //aenderung auf SML (von Power), da Script auf dem ESP an Power geändert
+    house = PO["Power_curr"]; // 134 
+  }
+  http.end();
 
   //zwei mal die Standard tasmota steckdose 
   readTasmotaSteckdose(powerBlueInverterGet,blueInverter,eBlueInverter);
   readTasmotaSteckdose(powerDeyeInverterGet,deyeInverter,eDeyeInverter);
+
+  //daten per modbus vom Inverter holen
+  readFromInverter();
 }    
 
 
@@ -51,6 +58,10 @@ void Power::readTasmotaSteckdose(const char *getString, int &power, bool &err)
       power = PO["Power"]; // 134 
     }
     http.end();
+  
+}
+void Power::readFromInverter()
+{
   
 }
 
