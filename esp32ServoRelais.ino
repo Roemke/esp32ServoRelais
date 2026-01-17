@@ -137,32 +137,42 @@ PubSubClient mqttClient(wifiClient);
 //--------------------websocket kram 
 void wsMessage(const char *message,AsyncWebSocketClient * client = 0)
 { 
-  const char * begin = "{\"action\":\"message\",\"text\":\"";
-  const char * end = "\"}";
-  char * str = new char[strlen(message)+strlen(begin)+strlen(end)+24];//Puffer +24 statt +1 :-)
-  strcpy(str,begin);
-  strcat(str,message);
-  strcat(str,end);
+  static constexpr size_t MAX_MSG = 1152;
+  char buf[MAX_MSG];
+  int n = snprintf(buf, sizeof(buf),
+                 "{\"action\":\"message\",\"text\":\"%s\"}", message);
+  //snprintf schreibt max sizeof(buf)-1 bytes + 0 - sicher. 
+  //Rückgabe Zahl der zu schriebenden bytes ohne die 0, also bei sizeof(buf) schon eins zu viel
+  // Rückgabe <0 format fehler, zeichensatzfehler o.ä. unwahrscheinlich
+
+  if ( n < 0 || n >= (int)sizeof(buf) ) {
+      strcpy(buf, "{\"action\":\"message\",\"text\":\"Strange - Message too large\"}");
+  }
+
   if (!client)
-    ws.textAll(str);
+    ws.textAll(buf);
   else
-    client->text(str);
+    client->text(buf);
     
-  delete [] str;
+  //delete [] str; hatte vorher str aber heap defragmentation möglich und gefährlich bei asynchron (nicht ganz klar use before copy, glaube ich nicht chat gpt)
 }
+
 void wsMessageNLB(const char *message,AsyncWebSocketClient * client = 0)
 { 
-  const char * begin = "{\"action\":\"messageNLB\",\"text\":\"";
-  const char * end = "\"}";
-  char * str = new char[strlen(message)+strlen(begin)+strlen(end)+24];//Puffer +24 statt +1 :-)
-  strcpy(str,begin);
-  strcat(str,message);
-  strcat(str,end);
+  static constexpr size_t MAX_MSG = 1152;
+  char buf[MAX_MSG];
+  int n = snprintf(buf, sizeof(buf),
+                 "{\"action\":\"messageNLB\",\"text\":\"%s\"}", message);
+
+  if ( n < 0 || n >= (int)sizeof(buf) ) {
+      strcpy(buf, "{\"action\":\"messageNLB\",\"text\":\"Strange - Message too large\"}");
+  }
+
   if (!client)
-    ws.textAll(str);
+    ws.textAll(buf);
   else
-    client->text(str);    
-  delete [] str;
+    client->text(buf);    
+  //delete [] str; alte variante
 }
 
 
@@ -183,34 +193,49 @@ void wsMsgSerialNLB(const char *message, AsyncWebSocketClient * client = 0) //No
 //daten aus dem Power-Objekt an die Clients senden
 void informClients()
 {
-  char *json =  power.getJSON("power");
+  char json[384];
+  power.getJSON("power",json,sizeof(json));
   ws.textAll(json);
 
   //und statusmeldungen als confirm senden, nein als status
   char status[384];
-  sprintf(status,"{\"action\":\"status\",\"intervalAutoAdjust\":%d,\"intervalAutoCharge\":%d,\"maxPowerBlue\":%d,\"minPercentBlue\":%d,",intervalAutoAdjust,intervalAutoCharge,power.maxPowerBlue,power.minPercentBlue);
-  strcat(status,"\"values\":[");
-  char end[]="]}";
+  int n = snprintf(status, sizeof(status),
+    "{\"action\":\"status\",\"intervalAutoAdjust\":%d,"
+    "\"intervalAutoCharge\":%d,\"maxPowerBlue\":%d,"
+    "\"minPercentBlue\":%d,\"values\":[", intervalAutoAdjust,intervalAutoCharge, power.maxPowerBlue,power.minPercentBlue);
+  //values kommen gleich 
+  
+  if (n < 0 || n >= (int)sizeof(status)) return; //ohne status zurück
+
+  //lambda zum anhängen,    [&] referenz-zugriff auf die Daten des scope, auto - typ selbst bestimmen
+  auto append = [&](const char *s) {
+    size_t len = strlen(status);
+    size_t sl  = strlen(s);
+    if (len + sl + 1 < sizeof(status))
+      strcat(status, s);
+  };
+
   if (ladeStatus == LadeStatus::BluettiDeye)
-    strcat(status,"\"bluettiDeye\",");
+    append("\"bluettiDeye\",");
   else if ( ladeStatus == LadeStatus::BluettiOnly )
-    strcat(status,"\"bluettiOnly\",");
+    append("\"bluettiOnly\",");
   else if ( ladeStatus == LadeStatus::DeyeOnly )
-    strcat(status,"\"deyeOnly\",");
+    append("\"deyeOnly\",");
 
 
-  (power.bluettiOutDC) ? strcat(status,"\"bluettiDCOn\",") : strcat(status,"\"bluettiDCOff\",");
+  (power.bluettiOutDC) ? append("\"bluettiDCOn\",") : append("\"bluettiDCOff\",");
   
   if (servoStatus == ServoStatus::Left)
-    strcat(status,"\"servoLeft\","); 
+    append("\"servoLeft\","); 
   else if (servoStatus == ServoStatus::Right)
-    strcat(status,"\"servoRight\","); 
+    append("\"servoRight\","); 
   else if (servoStatus == ServoStatus::Stop)
-    strcat(status,"\"servoStop\","); 
+    append("\"servoStop\","); 
 
-  (autoCharge) ? strcat(status,"\"autoChargeOn\",") : strcat(status,"\"autoChargeOff\",");  
-  (autoAdjustBlue) ? strcat(status,"\"autoAdjustBlueOn\"") : strcat(status,"\"autoAdjustBlueOff\"");  
-  strcat(status,end);
+  (autoCharge) ? append("\"autoChargeOn\",") : append("\"autoChargeOff\",");  
+  (autoAdjustBlue) ? append("\"autoAdjustBlueOn\"") : append("\"autoAdjustBlueOff\"");  
+  
+  append("]}");
   ws.textAll(status);
 }
 
@@ -250,12 +275,13 @@ void mqttPublish()
 void sendAvailableData(AsyncWebSocketClient * client, AsyncWebSocket *server)
 {
    //sende die Daten an den Client
+   char json[384];
    wsMessage(startmeldungen.htmlLines().c_str(),client);
    String msg = String("WebSocket client ") + String(client->id()) + String(" connected from ") +  client->remoteIP().toString();
    wsMsgSerial(msg.c_str());
    msg = String("Anzahl Clients: ") + server->count();
    wsMsgSerial(msg.c_str());
-   char * json = power.getJSON("power");
+   power.getJSON("power",json,sizeof(json));
    ws.textAll(json);
    informClients();
 }
@@ -266,7 +292,7 @@ void sendAvailableData(AsyncWebSocketClient * client, AsyncWebSocket *server)
 void bleNotifyCallback(const char * topic , String value)
 {
   //Serial.println("We have topic " + topic + " and val " + value);
-  static char out[256];
+  char out[256]; //ohne static, wg nebenläufigkeits problem
   #ifdef DEBUG
   strcpy(out,"in Callback, topic is");
   strcat(out,topic);
@@ -402,7 +428,7 @@ void onWSEvent(AsyncWebSocket     *server,  //
 //schalten, die confirmMessage wird gesendet
 void schalteLaden(LadeStatus dest)
 {
-  static char out[256];
+  char out[256]; //wieder besser ohne static
   strcpy(out,"{\"action\":\"confirm\",\"topic\":\"");
   int confirmLength = strlen(out);
   char confirmEnd[] = "\"}";
@@ -454,7 +480,7 @@ void schalteLaden(LadeStatus dest)
 */
 void handleAdjustBluetti()
 {
-  static char out[256];
+  char out[256];
   static bool firstCall = true;
   if (adjustBluettiFlag)
   {
@@ -533,7 +559,7 @@ void handleAdjustBluetti()
 
 void handleChargeSelect()
 {
-  static char out[256];
+  char out[256]; //besser ohne static
   if (chargeSelectFlag)
   {
     int solar = power.bluettiIn + power.deyeInverter;
@@ -582,18 +608,36 @@ void handleChargeSelect()
 }
 
 
-//nachricht vom client
+//nachricht vom client, stelle auf statische größen um, um heap-Fragmentierung zu vermeiden, keine Ahnung, ob
+//das tatsächlich ein Thema ist, aber ich kenne ja genau die maximale Websocket message, sie kommt ja vom eigenen
+//JS-Interfaces, ich sende action mit String und einen Wert
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) 
 {
   AwsFrameInfo *info = (AwsFrameInfo*)arg; 
-  static char out[256];
+  //static char out[256]; //chat gpt sagt, dass static ein problem sein könnte, wenn messages von unterschiedlichen clients herein kommen, 
+                        //da die Methode noch nicht durch ist. Ich dürfte mit lokalen Buffern kein Problem vom platz her haben, lege also 
+                        //diese an. Chat gpt spricht von ein paar kb Stack pro Funktion, genauer: AsyncWebServer-Tasks haben typischerweise 4–8 KB Stack
+  //static char in[256]; //duerfre reichen 
+  char out[256];
+  char in[256]; 
+  if (len >= 255) {   //
+    wsMsgSerial("WS message too large, should be impossible");
+    return;
+  }
+
+
   strcpy(out,"{\"action\":\"confirm\",\"topic\":\"");
   int confirmLength = strlen(out);
+  memcpy(in, data, len);
+  in[len] = '\0';
+
   char confirmEnd[] = "\"}";
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) 
   {
-    data[len] = 0; //sollte ein json object als String sein        
-    char *cData = (char *)data;
+    
+    //data[len] = 0; //sollte ein json object als String sein, uups Grenze nicht bedacht.
+
+    char *cData = (char *)in; //data; 
     //String s = cData; //legt eine Kopie an
     String message;
     const int capacity = JSON_OBJECT_SIZE(3)+2*JSON_OBJECT_SIZE(3);//+JSON_ARRAY_SIZE(RFID_MAX); //
@@ -773,7 +817,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
 //--------------------------------------------------------------
 void schalteRelais(const char * value) //muss const char * sein sonst meckert die JSON-Bibliothek
 {
-  static char out[256];
+  char out[256];
   strcpy(out,"Bin in Relais schalten: ");
   strcat(out,value);
   //wsMsgSerial(out);

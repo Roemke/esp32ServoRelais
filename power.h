@@ -74,7 +74,8 @@ class Power {
       void actualizeData();
       void beginModBus();
 
-      char *getJSON(const char *action);
+      //char *getJSON(const char *action);
+      size_t getJSON(const char *action, char *buf, size_t buflen);
       char *getString();
 
     private:

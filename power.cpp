@@ -74,11 +74,11 @@ void Power::readFromInverter()
   {
     Serial.print("deserializeJson() failed: ");
     Serial.println(error.c_str());
-    err = true;
+    //err = true;
   }
   else
   {   //folgendes muessten die nötigen Daten sein        
-      err = false;
+      //err = false;
       seGrid = doc["power"]; // 878.55 hier hoeher als seSun, da das Balkonkraftwerk auch geliefert hat
       seSun = doc["power_ac"]; // 768.35
       seHouse = seSun - seGrid; //negativ, wenn das balkonkraftwerk den vollen Verbrauch deckt
@@ -86,12 +86,18 @@ void Power::readFromInverter()
   }
 }
 
-char * Power::getJSON(const char * action)
+//meine erste variante arbeitete mit einem static char, das geht, kann aber gerade bei esp32 daneben gehen - mehrere Threads
+//char * Power::getJSON(const char * action)
+//methode sollte mit einem puffer von 384 bytes gerufen werden
+size_t Power::getJSON(const char *action, char *buf, size_t buflen)
 {
+   const char *fallback = "{\"action\":\"power\",\"error\":\"json_overflow\"}";
+  if (!buf || buflen < strlen(fallback)+1 ) return 0; //klarer fehlaufruf
+  
   StaticJsonDocument<256> doc;
-  static char output[384];
   doc["action"] = action;
-
+  //static char output[384]; //zu gefährlich
+  
   JsonObject values = doc.createNestedObject("values");
    
   values["powerHouse"] = house;
@@ -101,10 +107,7 @@ char * Power::getJSON(const char * action)
   values["bluettiOutAC"] = bluettiOutAC;
   values["bluettiIn"] = bluettiIn;
   values["bluettiPercent"] = bluettiPercent;
-  if (!bluettiDCState)
-    values["bluettiDCState"] = "off";
-  else 
-    values["bluettiDCState"] = "on";
+  values["bluettiDCState"] = bluettiDCState ? "on" : "off";
   values["eBluetti"] = eBluetti;
   values["eHouse"] = eHouse;
   values["eBlueInverter"] = eBlueInverter;  
@@ -116,8 +119,13 @@ char * Power::getJSON(const char * action)
   values["mBluettiPercent"] = 200;
   values["meanBluettiIn"] = 200;
   */
-  serializeJson(doc, output);
-  return output;
+  size_t n = serializeJson(doc, buf, buflen);
+  if (n == 0) { //fehler   
+    // sicher kopieren
+    strncpy(buf, fallback, buflen - 1);//schließt mit 0
+    buf[buflen - 1] = '\0'; //sicher gehen, falls platz nicht reichte    
+  }
+  return n ? n : strlen(buf);
 }
 char * Power::getString()
 {
