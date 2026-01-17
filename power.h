@@ -3,6 +3,8 @@
 #include "config.h"
 #include <ModbusIP_ESP8266.h>
 #include <HTTPClient.h>
+#include "credentials.h"
+
 #include <ArduinoJson.h> //ArduinoJson hat ein anderes Speicherkonzept als Arduino_Json
 
 
@@ -15,15 +17,17 @@
 
 class Power {
    public:
-    int house;           //aus webapi
-    int blueInverter;    //aus webapi
-    int deyeInverter;    //aus webapi
+    int house;           //aus webapi (vom esp am Stromzaehler)
+    int blueInverter;    //aus webapi (von Tasmota Steckdose)
+    int deyeInverter;    //aus webapi  ""
     
-    //daten des Wechselrichters
-    int seHouse; 
-    int seBattery;   
-    int seGrid; //Stromnetz 
-    int seSun;
+    //daten des Wechselrichters von solarEdge, hmm hier bin ich noch dran
+    float seHouse; 
+    float seBattery;   
+    float seGrid; //ins Stromnetz  ac
+    float seSun; //von den solarzellen, ac  
+
+    
 
 
     int bluettiOutDC;         //aus bluetooth ab hier

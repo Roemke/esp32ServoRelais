@@ -10,7 +10,8 @@ festmachen, da die Photovoltaik immer versucht das System auf 0 verbrauch zu
 bringen. Daher den branch masterModbus gewählt (modbus ist eine Möglichkeit 
 den Wechselrichter lokal abzufragen, der zugehörige server läuft auf einem 
 Raspberry pi und wird über einen Port angesprochen, dort liefert er json 
-daten  kleines python Programm)
+daten  kleines python Programm) 
+Habe das leider nicht mehr weiter verfolgt. 
 
 Ziel: 
  - Servo steuern (poti fuer den Inverter am Bluetti drehen)
@@ -25,16 +26,18 @@ Die Tasmota-Devices senden per mqtt an fhem, verwende die Werte hier nicht mehr,
 Bisher läuft 
  - Der Webserver mit websockets (da ich ihn vorher hatte)
  - Power wird dargestellt, habe pubsub mqtt client genommen
- - Servo lässt sich testweise drehen
+ - Servo lässt sich testweise drehen, auch einstellen
  - Werte aus mqtt werden dargestellt
- - Relais lassen sich testweise schalten
+ - Relais lassen sich testweise schalten, kann inzwischen umschalten in der 
+   Einspeisung, Haus oder Bluetti, teils oder ganz
  - bluetti wird ausgelesen und schalten geht 
  - Bluetti von mqtt abgekapselt, eigene "Bibliothek" geschrieben
    ist nicht perfekt aber geht
  - alles auf github geschoben     
  - dieses gerät kann als mqtt in fhem eingebunden werden, es bekommt von fhem 
    die daten gesendet, dies nur im mqtt branch, der seit ein paar Wochen nicht mehr weiter entwickelt wird.
- - aber sende per mqtt um die Daten in fhem darstellen zu können und dort einen link auf das Webinterface zu ermöglichen 
+ - aber sende per mqtt um die Daten in fhem darstellen zu können und dort einen link auf das Webinterface zu ermöglichen
+   hmm, ist das noch aktuell ist schon einiges an Zeit her 
  - umgestellt auf webapi der verschiedenen tasmota-devices, eine Steckdose am Deye-Inverter, eine Steckdose am Inverter, der über 12 Volt von der Bluetti versorgt wird, ein IR-Lesekopf mit 
    spezieller Tasmota-Version um den Stromzähler auszulesen
  

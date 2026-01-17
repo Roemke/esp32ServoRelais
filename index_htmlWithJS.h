@@ -562,7 +562,8 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
     Beim Umschalten auf &quot;nur Haus versorgen (Deye)&quot; dauert es einige Zeit, bis der Deye-Inverter merkt, dass er von den Solarzellen versorgt wird, 
     falls vorher nur die Bluetti geladen wurde.  
     </p>
-    <p>BluettiOut anpassen versucht die Leistung der Bluetti an den Hausverbrauch anzupassen. Hier wird nicht zwischen Bluetti laden, beide Laden und nur Deye versorgen 
+    <p>BluettiOut anpassen ist in dieser Version noch nicht umgesetzt, da ich den Hausverbrauch aktuell nicht lesen kann. Der Inverter von 
+    Solaredge hält ihn sowieso auf Null wenn es geht. Hier wird nicht zwischen Bluetti laden, beide Laden und nur Deye versorgen 
     umgeschaltet, das ist (zunächst?) separat gehalten. Der  Servo-Motor wird angesteuert.</p>
     <p>Die Auto-Einstellungen haben ein Intervall, in dem Sie durchgeführt werden, Voreinstellung alle 120 Sekunden. </p>
     <p>Die maximale Leistung mit der die Bluetti einspeist kann eingestellt werden, da die Verluste bei höherer Leistung mehr als proportional anwachsen </p>

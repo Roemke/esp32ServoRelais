@@ -62,7 +62,28 @@ void Power::readTasmotaSteckdose(const char *getString, int &power, bool &err)
 }
 void Power::readFromInverter()
 {
-  
+  http.begin(inverterServerGet);
+  http.GET();//{"power":878.55,"power_ac":768.35,"power_bat":0.11,"power_dc":780.22,"soe":98.89}
+  //https://arduinojson.org/v6/assistant/#/step1 esp32 stream
+  StaticJsonDocument<128> doc;
+
+  //folgender Code wird generiert, mit input
+  DeserializationError error = deserializeJson(doc,http.getStream());// input);
+
+  if (error) 
+  {
+    Serial.print("deserializeJson() failed: ");
+    Serial.println(error.c_str());
+    err = true;
+  }
+  else
+  {   //folgendes muessten die nötigen Daten sein        
+      err = false;
+      seGrid = doc["power"]; // 878.55 hier hoeher als seSun, da das Balkonkraftwerk auch geliefert hat
+      seSun = doc["power_ac"]; // 768.35
+      seHouse = seSun - seGrid; //negativ, wenn das balkonkraftwerk den vollen Verbrauch deckt
+      seBattery = doc["soe"]; // 98.89
+  }
 }
 
 char * Power::getJSON(const char * action)
