@@ -1,3 +1,12 @@
+Readme.md eher für mich, alles noch ein ziemlicher Bastelstatus ...
+
+Umstellung auf platformIO und nochmal recherche bezüglich dessen, was ich
+über den rasberry pi am solaredge inverter abrufen kann. Siehe 
+/Data/Infos/raspberry/raspiFHEM/solaredge_modbus - mache daraus ein Repo auf
+github, piSolarEdgeModbus
+
+
+aeltere Notizen 
 Projekt aus meinem RFID-Relais Projekt kopiert - da ich es immer vergesse bzw. Arduino Ide immer die Einstellungen
 des aktuellen Projektes behält, statt sie pro Projekt zu speichern:
 verwende D1 Mini ESP32 und Partion Minimal SPIFFS (Large Apps with OTA) 

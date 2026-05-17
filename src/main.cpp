@@ -7,27 +7,25 @@ kleine Schraube möglich -> servo
 getestet mit Esp32 D1 Mini, Partition Schema Minimal SPIFFS sonst dürfte OTA nicht gehen
 todo: 
   - paar Warnings
-  - Asynch Webserver geht inzwischen woll besser, s. Warning
+  - Asynch Webserver geht inzwischen wohl besser, s. Warning
   - Servo hier nur in alter Version, neue braucht gnu++17 damit geht aber der esp nicht
   - NimBLE - Version 1.4.0 genutzt, 1.4.1 tut es nicht für mich, bekomme keine Antwort von der Bluetti
   - bluetooth - evtl. doch reboot esp, inzwischen die settings in preferences gespeichert
-  - habe ein wenig ueberarbeitet, merge-conflict erzeugt, aber geloest, sollte der neueste Stand sein.
 **/
-#define ESP32 1
+
+#include <Arduino.h>
 #include <WiFi.h>
 #include <ArduinoOTA.h>
 #include <Preferences.h>        
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-#include <AsyncElegantOTA.h>//mist, der braucht den ESPAsyncWebServer, habe mal in der Bibliothek angepasst, so dasss es auch mit ESPAsyncWebSrv.h geht
+//#include <AsyncElegantOTA.h>//mist, der braucht den ESPAsyncWebServer, habe mal in der Bibliothek angepasst, so dasss es auch mit ESPAsyncWebSrv.h geht
                               //und wieder zurück, nehme den AsyncWebServer Bibliothek manuell installiert aus zip
+#include <ElegantOTA.h> //modernerer OTA, der mit dem AsyncWebServer zusammenarbeitet
 #include <ArduinoJson.h> //ArduinoJson hat ein anderes Speicherkonzept als Arduino_Json
 #include <PubSubClient.h>
 #include <HTTPClient.h>
-
 #include <Servo.h>
-
-
 //#define DEBUG 1
 //----------------------------------die Bluetti betreffend
 #define AC200M          2
@@ -47,6 +45,7 @@ todo:
  * ich kann nur die AC200M testen
  */
 
+
 bluetti_command_t bluettiCommand = {bluetti_polling_command,sizeof(bluetti_polling_command),
                                 bluetti_device_command,sizeof(bluetti_device_command),
                                 bluetti_device_state,sizeof(bluetti_device_state)};
@@ -56,24 +55,9 @@ bluetti_command_t bluettiCommand = {bluetti_polling_command,sizeof(bluetti_polli
 //---------------------------------------------------------
 
 #include "credentials.h" //erstellen, s. credentials_template.h
-
 #include "ownLists.h"
 #include "index_htmlWithJS.h" //variable mit dem HTML/JS anteil
 #include "power.h"
-/*
- * Alte Datei kopiert und auf servo reais etc angepasst, Steuerung / Auslesen der Werte Solar und Strom-Kram 
- * Leider probleme mit dem selbst gebastelten (nach diversen Tutorials) webserver
- * Erster Versuch noch mit eigenem Webserver, jedoch Fehlermeldungen im Betrieb, nach etwas Recherche stelle um
- * auf https://github.com/dvarrel/ESPAsyncWebSrv das ist ein Fork von https://github.com/me-no-dev/ESPAsyncWebServer
- * dahinter steckt dann Hristo Gochkov's ESPAsyncWebServer 
- * Der unterstützt auch Websockets und nachdem ich 2014 oder so damit keinen Erfolg hatte (Browserstress), sollte es inzwischen ja gehen 
- * Tutorial: https://m1cr0lab-esp32.github.io/remote-control-with-websocket/
- * geht sogar gut, stelle großteils darauf um
- * 
- * Außerdem: ArduinoJson -> dort ein Link auf HeapFragmentation, hoffe mal das es kein Thema bei den par Strings ist - die sorgen 
- * für stress, ArduinoJson sorgt jedoch für eine Vermeidung von HeapFragmentation, auch wenn man dynamisch alloziiert. 
- * auf der WebSite findet sich ein calculator für den Speicher
- */
 
 //in credentials.h, s. auch credentials_template.h
 //#define mySSID "todo"
@@ -117,11 +101,14 @@ long lastAutoCharge = 0;
 
 
  
-
+void handleWebSocketMessage(void*, uint8_t*, size_t);
+void schalteRelais(const char*);
+void resetStandardSettings();
 
 AsyncWebServer server(80);
 //fuer den Websocket
 AsyncWebSocket ws("/ws");
+                          
 unsigned long keepWebServerAlive = 0; //240000; //milliseconds also 4 Minuten, danach wird wifi abgeschaltet.
 //in dieser Zeit ein client connect -> der Server bleibt aktiv, 0 er bleibt aktiv, lohnt nicht, bringt bei 12 V nur 6mA gewinn
 unsigned long startTime;
@@ -302,6 +289,12 @@ void bleNotifyCallback(const char * topic , String value)
   {
     power.bluettiPercent = value.toInt();
     power.eBluetti = false;
+
+     /* char dbg[64];
+      sprintf(dbg, "bluettiPercent raw: %s", value.c_str());
+      wsMsgSerial(dbg);
+     */
+  
   }
   else if (!strcmp(topic, "dc_input_power"))
   {
@@ -324,7 +317,7 @@ void bleNotifyCallback(const char * topic , String value)
     power.bluettiOutAC = value.toInt();
     power.eBluetti = false;
   }
-
+  
   #ifdef DEBUG
   sprintf(out,"Power: State: %d Percent %d out DC %d out AC %d in %d",power.bluettiDCState, power.bluettiPercent,power.bluettiOutDC,power.bluettiOutAC, power.bluettiIn);
   wsMsgSerial(out);
@@ -335,31 +328,23 @@ Bluetti blue((char *) "AC200M2308002058882",bluettiCommand,bleNotifyCallback); /
 
 
 void reconnect() {
-  // Loop until we're reconnected
-  while (!mqttClient.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    // Attempt to connect
-    if (mqttClient.connect("ESP32Solar")) {
-      Serial.println("connected");
-      // Subscribe - nein ist raus
-      /*
-      mqttClient.subscribe("tele/DVES_17B73E/SENSOR");
-      mqttClient.subscribe("tele/DVES_352360/SENSOR");//power haus ist tasmota, das kann ich so abgreifen
-      mqttClient.subscribe("tele/DVES_9C2197/SENSOR");//alles andere an tasmota devices geht nicht, seltsam buffer problem
-      mqttClient.subscribe("tele/DVES_183607/SENSOR");
-      */
-      /*
-       * Hmm, unter http://192.168.0.203:8083/fhem?detail=MQTT2_ESP32Solar und dann subscriptions ist auch nur das erste 
-       */
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(mqttClient.state());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
-    }
+  if (mqttClient.connected()) return;
+  
+  long now = millis();
+  static long lastReconnectAttempt = 0;
+  
+  if (now - lastReconnectAttempt < 5000) return; // nur alle 5s versuchen
+  lastReconnectAttempt = now;
+  
+  Serial.print("Attempting MQTT connection...");
+  if (mqttClient.connect("ESP32Solar")) {
+    Serial.println("connected");
+  } else {
+    Serial.print("failed, rc=");
+    Serial.println(mqttClient.state());
   }
 }
+
 void setupMQTT() 
 {
   mqttClient.setBufferSize(1024);
@@ -470,143 +455,158 @@ void schalteLaden(LadeStatus dest)
     ws.textAll(out);
   }
 }
-//Falls Zustand ok die Bluetti einschalten 
-/*
-  Die Funktion ist noch nicht ok, hatte delays zum Testen eingebaut, wird sie ohne ausgeführt, dann bekomme ich einen Absturz
-  des ESP - noch unklar, noe muesste inzwischen ok sein 
-  dennoch delays? 
-  Problem: manchmal ist das System bei einer Leistung von 200 Watt gewesen, obwohl max meist auf ca 100 steht. 
-           vermute das es am ausschalten liegt und dann der Servo auf erhöhen gesetzt wird?
-*/
+//Falls Zustand ok die Bluetti einschalten und Leistung anpassen.
 void handleAdjustBluetti()
 {
   char out[256];
   static bool firstCall = true;
-  if (adjustBluettiFlag)
+  
+
+  if (!adjustBluettiFlag) return;
+
+  if (firstCall)
   {
-    if (firstCall)
+    strcpy(out,"check blue adjust - ");
+    strcat(out,power.getString());
+    wsMsgSerial(out);
+    firstCall = false;
+  }
+  else
+  {
+    sprintf(out,"(%d)",power.blueInverter);
+    wsMsgSerialNLB(out);
+  }
+
+  // Abbruchbedingungen
+  if (power.eBluetti || power.bluettiPercent <= power.minPercentBlue)
+  {
+    adjustBluettiFlag = false;
+    firstCall = true;
+    return;
+  }
+
+  // Bluetti einschalten falls noch aus
+  if (!power.bluettiDCState)
+  {
+    wsMsgSerial("schalte Bluetti an");
+    blue.switchOut((char *) "dc_output_on", (char *) "on");
+    blue.handleBluetooth();
+    delay(2000);
+    return;
+  }
+
+  // Netzbezug vorhanden und unter maxPowerBlue -> erhöhen
+  if (power.seGrid < -30.0 && power.blueInverter < power.maxPowerBlue)
+  {
+    if (servoStatus != ServoStatus::Left)
     {
-      strcpy(out,"check blue adjust - "); //erst dann ausgabe, kommt sonst zu oft, da kein Delay da ist
-          //      012345678901234567890 
-      strcat(out,power.getString());
-      wsMsgSerial(out);
-      firstCall = false;
+      servoStatus = ServoStatus::Left;
+      servo.write((int) servoStatus);
     }
-    else 
+    wsMsgSerialNLB("(+)"); //zeige Erhöhung
+    delay(1000);
+    return;
+  }
+
+  // kein Netzbezug mehr oder maxPowerBlue erreicht -> verringern
+  if (power.seGrid > 30.0 || power.blueInverter > power.maxPowerBlue)
+  {
+    // abschalten wenn kaum noch Last
+    if (power.seGrid > 30.0 && power.blueInverter < 40)
     {
-      sprintf(out,"(%d)",power.blueInverter); //Blueinverter ist die aktuelle Leistung 
-      wsMsgSerialNLB(out);
+      blue.switchOut((char *) "dc_output_on", (char *) "off");
+      blue.handleBluetooth();
+      wsMsgSerial("kein Bedarf mehr, schalte Bluetti ab");
+      servoStatus = ServoStatus::Stop;
+      servo.write((int) servoStatus);
+      adjustBluettiFlag = false;
+      firstCall = true;
+      ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluettiDone\"}");
+      delay(2000);
+      return;
     }
-    if (!power.eBluetti && power.bluettiPercent > power.minPercentBlue  )
+    // sonst verringern
+    if (servoStatus != ServoStatus::Right)
     {
-      if (power.house > 0 && ! power.bluettiDCState  && power.blueInverter < 10 ) //power.blueInverter reagiert schneller als der bluetooth state
-      {
-        wsMsgSerial("Hausverbrauch > 0, schalte Bluetti an");
-        blue.switchOut((char *) "dc_output_on",(char *) "on"); //glaube, das geht nicht, vielleicht weil die handleBluetooth geschichte nicht gerufen wird?
-        //ja daran lag es, arbeite inzwischen mit flag
-        blue.handleBluetooth();
-        delay (2000);
-      }
-      if (power.house > 20 && power.bluettiPercent > power.minPercentBlue && !power.eBluetti && power.blueInverter > 10 && power.blueInverter < 0.85 *power.maxPowerBlue) //faktor experimentell
-      {//nehme fuer das erhöhen mal die power des Inverters dazu
-        if (servoStatus != ServoStatus::Left)
-        {
-          servoStatus = ServoStatus::Left; //erhoehen
-          servo.write((int) servoStatus);
-        }
-        //wsMsgSerial("Hausverbrauch > 0, bleibe beim Erhöhen der Bluetti ");
-        wsMsgSerialNLB("(+)");
-        delay (1000);
-      } 
-      else if (power.house < -10 && power.blueInverter>38 || power.blueInverter > power.maxPowerBlue) //kleiner als 34 klappt nicht
-      {
-        if (servoStatus != ServoStatus::Right) //verringern
-        {
-          servoStatus = ServoStatus::Right;
-          servo.write((int) servoStatus);
-        }
-        //wsMsgSerial("Hausverbrauch <0 oder input inverter zu hoch , bleibe beim Verringern der Bluetti");
-        wsMsgSerialNLB("(-)");
-        delay (1000);
-        if (power.house < -35 && power.bluettiDCState && power.blueInverter > 20) //power.blueInverter reagiert schneller als der bluetooth state
-        {
-          blue.switchOut((char *) "dc_output_on",(char *) "off");
-          wsMsgSerial("Verbrauch < -35 schalte Blue aus, adjust blue done");
-          servoStatus = ServoStatus::Stop;
-          servo.write((int) servoStatus);
-          adjustBluettiFlag = false;
-          firstCall = false;
-          ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluettiDone\"}");
-          blue.handleBluetooth();
-          delay (2000);
-        }
-      }
-      else // abschalten servo
-      {
-          servoStatus = ServoStatus::Stop;
-          servo.write((int) servoStatus);
-          adjustBluettiFlag = false;
-          wsMsgSerial("adjust Blue done");
-          firstCall = false;
-          ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluettiDone\"}");
-          delay (100);
-      }
+      servoStatus = ServoStatus::Right;
+      servo.write((int) servoStatus);
     }
-    else
-          adjustBluettiFlag = false; //wenn die bluetti kleiner als min hat, dann muss gar nichts getan werden
+    wsMsgSerialNLB("(-)"); //zeige verringerung
+    delay(1000);
+    return;
+  }
+
+  // Servo stoppen - im Lot (-30 < seGrid < 30)
+  if (servoStatus != ServoStatus::Stop)
+  {
+    servoStatus = ServoStatus::Stop;
+    servo.write((int) servoStatus);
+    wsMsgSerial("adjust Blue - Servo stop, im Lot");
+    firstCall = true;
+    ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluettiDone\"}");
+    delay(100);
   }
 }
 
 void handleChargeSelect()
 {
-  char out[256]; //besser ohne static
-  if (chargeSelectFlag)
-  {
-    int solar = power.bluettiIn + power.deyeInverter;
-    int house = power.house + power.deyeInverter + power.blueInverter;
-    if (power.house > 0) //normaler check 
-    {
-      sprintf(out,"check autoCharge, house %d, solar %d and ",house, solar);
-      strcat(out,power.getString());
-      wsMsgSerial(out);
-    }
-    else //wird ggf. recht oft gerufen
-    {
-      sprintf(out,"(%d)",power.house);
-      wsMsgSerialNLB(out);
-    }
-    if (power.eBluetti && ladeStatus == LadeStatus::BluettiDeye ) //fehler bluetooth  
-        solar = 2*power.deyeInverter;
-    if ((solar < house  || house  > 400)&& power.deyeInverter > 10 ) //power deyeInverter dazu, denn falls er hängt wenigstens die Bluetti laden 
-    {
-      schalteLaden(LadeStatus::DeyeOnly);
-      //adjustBluettiFlag = true; lassen wir
-    }
-    else 
-    {
-      //schalte nur noch auf beide um, da das deye-teil ewig braucht, bis es wieder zum leben erwacht
-      if (power.bluettiPercent <= 99)
-        schalteLaden(LadeStatus::BluettiDeye);
-      /*
-      if (power.bluettiPercent <= 99)
-      {        
-        //lassen wir adjustBluettiFlag = true;
-        if (house > power.maxPowerBlue * 1.5 )
-          schalteLaden(LadeStatus::BluettiDeye);
-        else 
-        {
-          schalteLaden(LadeStatus::BluettiOnly); //hmm, dann sollte aber die Ausgabe der Bluetti angepasst werden ?
-          adjustBluettiFlag = true; nein
-        }
-      }
-      else 
-        schalteLaden(LadeStatus::DeyeOnly);
-      */
-    }
-  }
+  if (!chargeSelectFlag) return;
   chargeSelectFlag = false;
-}
 
+  char out[256];
+
+  // Priorität 1: Bluetti laden wenn genug energie
+  if (power.bluettiPercent < 98.0 
+      && power.seSoe > 98.0
+      && power.seGrid > 200.0)
+  {
+    if (power.seGrid > 400.0)
+    {
+      schalteLaden(LadeStatus::BluettiOnly);
+      wsMsgSerial("AutoCharge: viel Überschuss -> beide Panels auf Bluetti");
+    }
+    else
+    {
+      schalteLaden(LadeStatus::BluettiDeye);
+      wsMsgSerial("AutoCharge: Überschuss -> ein Panel Bluetti, ein Panel Deye");
+    }
+    // Bluetti Inverter aus
+    if (power.bluettiDCState)
+    {
+      blue.switchOut((char *) "dc_output_on", (char *) "off");
+      blue.handleBluetooth();
+    }
+    servoStatus = ServoStatus::Stop; //zur Sicherheit servo stoppen.
+    servo.write((int) servoStatus);
+    adjustBluettiFlag = false;
+    return;
+  }
+
+  // Priorität 2: Bluetti unterstützt SolarEdge
+  if (power.seGrid < -50.0 && power.bluettiPercent > 10)
+  {
+    schalteLaden(LadeStatus::DeyeOnly);
+    if (!power.bluettiDCState)
+    {
+      blue.switchOut((char *) "dc_output_on", (char *) "on");
+      blue.handleBluetooth();
+    }
+    adjustBluettiFlag = true; // Servo regelt auf max 120W
+    wsMsgSerial("AutoCharge: Netzbezug -> Bluetti unterstützt");
+    return;
+  }
+
+  // Sonst: alles auf Deye, Bluetti aus
+  schalteLaden(LadeStatus::DeyeOnly);
+  if (power.bluettiDCState)
+  {
+    blue.switchOut((char *) "dc_output_on", (char *) "off");
+    blue.handleBluetooth();
+    servoStatus = ServoStatus::Stop;
+    servo.write((int) servoStatus);
+    adjustBluettiFlag = false;
+  }
+}
 
 //nachricht vom client, stelle auf statische größen um, um heap-Fragmentierung zu vermeiden, keine Ahnung, ob
 //das tatsächlich ein Thema ist, aber ich kenne ja genau die maximale Websocket message, sie kommt ja vom eigenen
@@ -638,11 +638,10 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
     //data[len] = 0; //sollte ein json object als String sein, uups Grenze nicht bedacht.
 
     char *cData = (char *)in; //data; 
-    //String s = cData; //legt eine Kopie an
-    String message;
-    const int capacity = JSON_OBJECT_SIZE(3)+2*JSON_OBJECT_SIZE(3);//+JSON_ARRAY_SIZE(RFID_MAX); //
+    //String s = cData; //legt eine Kopie an    
+    //const int capacity = JSON_OBJECT_SIZE(3)+2*JSON_OBJECT_SIZE(3);//+JSON_ARRAY_SIZE(RFID_MAX); //
     
-    StaticJsonDocument<capacity> doc; //hinweis: doc nur einmal verwenden 
+    JsonDocument doc; //hinweis: doc nur einmal verwenden 
     Serial.println("we have in WebSocketMessage: ");
     Serial.println(cData);
     
@@ -872,7 +871,7 @@ void resetStandardSettings()
   preferences.putBool("autoAdjustBlue",autoAdjustBlue);
   power.maxPowerBlue = 100;
   preferences.putInt("maxPowerBlue",power.maxPowerBlue );
-  power.minPercentBlue = 20;
+  power.minPercentBlue = 10;
   preferences.putInt("minPercentBlue",power.minPercentBlue );
   intervalAutoAdjust = 120;
   preferences.putInt("intAutoAdjust",intervalAutoAdjust );
@@ -920,8 +919,6 @@ void setup() {
   //bluetti bluetooth
   blue.initBluetooth();
 
-  //power muss modbus initialisieren
-  power.beginModBus();
   
   //Der Rest sind doch nur callbacks und der WebSocket-Server sollte gehen 
   server.onNotFound(notFound);
@@ -934,13 +931,12 @@ void setup() {
 
   //normale Anfrage
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-  {
-    request->send_P(200, "text/html", index_html, processor); //durch processor filtern     
+  {    
+    request->send(200, "text/html", index_html, processor);
   });
   ws.onEvent(onWSEvent);
   server.addHandler(&ws); //WebSocket dazu 
-  AsyncElegantOTA.begin(&server);    // Start ElegantOTA
-  server.begin();
+  ElegantOTA.begin(&server);   server.begin();
   //andernfalls startet er ohne wifi, registrieren von Elementen nicht möglich, nein habe mal einen ap-modus gesetzt  
   //eine kleine Pause von 50ms.
   delay(50);
@@ -955,7 +951,7 @@ void setup() {
   autoCharge = preferences.getBool("autoCharge", false);
   autoAdjustBlue = preferences.getBool("autoAdjustBlue", false);
   power.maxPowerBlue  = preferences.getInt("maxPowerBlue",100);
-  power.minPercentBlue  = preferences.getInt("minPercentBlue",20);
+  power.minPercentBlue  = preferences.getInt("minPercentBlue",10);
   intervalAutoAdjust  = preferences.getInt("intAutoAdjust",120);
   intervalAutoCharge = preferences.getInt("intAutoCharge",120 );
   //informClients(); nein, in Startmeldungen, das reicht 
@@ -1004,18 +1000,12 @@ void loop() {
   }
   now = millis();
   delta = now -  lastBluettiAdjust ;
-  if (delta > 1000 * intervalAutoAdjust && autoAdjustBlue )
+  if (delta > 1000 * intervalAutoAdjust && autoAdjustBlue && ladeStatus == LadeStatus::DeyeOnly)
+  //nur anpassen, wenn Bluetti nicht  lädt, denn dann braucht sie nicht einspeisen, wir haben überschuss.
   {
     lastBluettiAdjust = now;
     adjustBluettiFlag = true;
   }
-  /*
-  else if (power.house < -30 && power.blueInverter > 20) //zu starke bluetti einspeisung auf jeden Fall anpassen
-  {
-    //    adjustBluettiFlag = true; //Nein, denn dann bleibt es in dem Zustand und ich kann es nicht mehr sinnvoll steuern
-
-  } 
-  */
   
 
   delta = now -  lastAutoCharge ;

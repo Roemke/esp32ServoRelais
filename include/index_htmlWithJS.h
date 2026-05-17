@@ -156,6 +156,12 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       .confirmedTouch {
       	background-color: #0a0;
       }
+      .green {
+      	color: rgb(7, 81, 7);
+      }
+      .red {
+      	color: rgb(99, 8, 8);
+      }  
     </style>
     <script>
       let gateway = `ws://${window.location.hostname}/ws`;
@@ -302,23 +308,44 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
                 let vBDCP = document.getElementById("valBluePowerDC");
                 let vBACP = document.getElementById("valBluePowerAC");
                 let vBP = document.getElementById("valBluettiPercent");
+                let vSEGrid    = document.getElementById("valSEGrid");
+                let vSEPowerAC = document.getElementById("valSEPowerAC");
+                let vSEPowerDC = document.getElementById("valSEPowerDC");
+                let vSEPowerBat= document.getElementById("valSEPowerBat");
+                let vSESoe     = document.getElementById("valSESoe");
+                let seGrid = data.values.seGrid;
+                vSEGrid.classList.remove("green","red");
+                let seGridString = seGrid >=0 ? seGrid.toFixed(0) + " W Einspeisung" 
+                                              : (-seGrid).toFixed(0) + " W Bezug";
+                if (seGrid >= 0)
+                  vSEGrid.classList.add("green");
+                else
+                  vSEGrid.classList.add("red");
+
+                vSEGrid.innerHTML    =  seGridString;
+                vSEPowerAC.innerHTML = data.values.sePowerAC.toFixed(0) + " W";
+                vSEPowerDC.innerHTML = data.values.sePowerDC.toFixed(0) + " W";
+                vSEPowerBat.innerHTML= data.values.sePowerBat.toFixed(0)+ " W";
+                vSESoe.innerHTML     = data.values.seSoe.toFixed(1)     + " %%";
   
                 vDateTime.innerHTML =  "(" + now.toLocaleDateString('en-CA') + 
                                        " " + now.toLocaleTimeString('de-DE') + ")";
                 
 
-                vph.innerHTML = (!data.values.eHouse) ? data.values.powerHouse + " W " : '?'; 
-                vphS.innerHTML = (!data.values.eHouse) ? data.values.powerHouse + " W " : '?'; 
-                vSDP.innerHTML = (!data.values.eDeyeInverter) ? data.values.powerDeyeInv + " W I." : '?';
-                vBIP.innerHTML = (!data.values.eBlueInverter) ? data.values.powerBlueInv + " W I." : '?';                                
+                vph.innerHTML =  data.values.powerHouse.toFixed(0) + " W " ; 
+                vphS.innerHTML = data.values.powerHouse.toFixed(0) + " W " ; 
+                vSDP.innerHTML = (!data.values.eDeyeInverter) ? data.values.powerDeyeInv.toFixed(0) + " W I." : '?';
+                vBIP.innerHTML = (!data.values.eBlueInverter) ? data.values.powerBlueInv.toFixed(0) + " W I." : '?';                                
                                  
-                vBSolarP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiIn + " W" : '?';
+                vBSolarP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiIn.toFixed(0) + " W" : '?';
                 let solarTotal = parseFloat((!data.values.eBluetti) ? data.values.bluettiIn : 0) ;
                 solarTotal += parseFloat((!data.values.eDeyeInverter) ? data.values.powerDeyeInv : 0);
-                vps.innerHTML = solarTotal + " W"; 
-                vBDCP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiOutDC : '?'; 
-                vBACP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiOutAC +" W" : '? W'; 
-                vBP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiPercent + " %%": "?" ;
+                solarTotal += data.values.sePowerDC;
+
+                vps.innerHTML = solarTotal.toFixed(0) + " W"; 
+                vBDCP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiOutDC.toFixed(0) +" W" : '? W'; 
+                vBACP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiOutAC.toFixed(0) +" W" : '? W'; 
+                vBP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiPercent.toFixed(1) + " %%": "?" ;
                 //status anhand der Werte ablesen
 
               break;
@@ -491,6 +518,12 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         <!-- neue Zeile -->
         <div>Blue P: <span id="valBluePowerDC">? </span>/<span id="valBluePowerAC">?</span></div>
         <div id="valBlueInvPower">?</div>
+        <!-- SolarEdge -->
+        <div>SE Netz: <span id="valSEGrid">?</span></div>
+        <div>SE AC: <span id="valSEPowerAC">?</span></div>
+        <div>SE DC (Solar): <span id="valSEPowerDC">?</span></div>
+        <div>SE Bat: <span id="valSEPowerBat">?</span></div>
+        <div>SE Ladestand: <span id="valSESoe">?</span></div>
       </div>
     </div>
   <div class="framed" id = "dManuell">
@@ -569,8 +602,9 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
     <p>Die maximale Leistung mit der die Bluetti einspeist kann eingestellt werden, da die Verluste bei höherer Leistung mehr als proportional anwachsen </p>
     <div class = "hinweis">Ein Update der Firmware / des Sketches kann &uuml;ber OTA erfolgen.
       <ol>
-        <li>Bin-Datei erzeugen, in der IDE Sketch -> Kompilierte ... exportieren oder Strg Alt s </li>
-        <li>Upload der Firmware über %UPDATE_LINK% (findet sich im Sketchordner / Unterordner) </li>
+        <li>Bin-Datei erzeugen, kompilieren in code, landet im Ordner .pio/build/esp32dev/firmware.bin </li>
+        <li>Upload der Firmware über %UPDATE_LINK% (findet sich im Sketchordner / Unterordner) <br>
+             -- danach noch ein Reset nötig !?</li>
       </ol>
     </div>
     </div>
