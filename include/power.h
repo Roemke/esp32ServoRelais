@@ -38,6 +38,8 @@ class Power {
     int minPercentBlue;
     bool bluettiDCState; 
 
+    int seGridMinCharge;   // Mindest-Überschuss um ein Panel auf Bluetti zu schalten (200W)
+    int seGridBothCharge;  // Überschuss um beide Panels auf Bluetti zu schalten (400W) 
     
     //Mittelwerte
     /* das ist noch nicht durchdacht, weiss nicht, ob ich das möchte  
@@ -72,6 +74,8 @@ class Power {
         minPercentBlue = 20;
         seHouse = seGrid = sePowerAC = sePowerDC = sePowerBat = seSoe = 0; 
         http.useHTTP10(true); //use old http1.0 - stream is not chunked
+        seGridMinCharge = 200;
+        seGridBothCharge = 400;
       }
       void actualizeData();
       //void beginModBus();

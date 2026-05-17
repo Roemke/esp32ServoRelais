@@ -130,7 +130,11 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       }
       #dManuell .span3 {
         grid-column: auto / span 3;
-      }      
+      } 
+      #dManuell small {
+        grid-column: 1 / -1;
+      }
+               
       .framed { 
        border: 1px solid black; 
        padding: 1em;
@@ -376,6 +380,10 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
                   document.getElementById('maxPowerBlue').value = data.maxPowerBlue;
                 if (document.activeElement.id != 'minPercentBlue')
                   document.getElementById('minPercentBlue').value = data.minPercentBlue;
+                if (document.activeElement.id != 'seGridMinCharge')
+                  document.getElementById('seGridMinCharge').value = data.seGridMinCharge;
+                if (document.activeElement.id != 'seGridBothCharge')
+                  document.getElementById('seGridBothCharge').value = data.seGridBothCharge;  
                 data.values.forEach(  evaluateConfirm );//sollte ein Array sein, dieses abarbeiten
               break;
             } 
@@ -491,6 +499,14 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         {
           document.getElementById("dInfo").classList.toggle("displayNone");
           document.getElementById("dInfoS").classList.toggle("displayNone");
+        });
+        document.getElementById("seGridMinCharge").addEventListener("change",evt =>
+        {
+            websocket.send(JSON.stringify({'action':'seGridMinCharge','value':evt.target.value}));
+        });
+        document.getElementById("seGridBothCharge").addEventListener("change",evt =>
+        {
+            websocket.send(JSON.stringify({'action':'seGridBothCharge','value':evt.target.value}));
         });      
         //--------------
         //die relais testen -> buttons im form, im Betrieb nicht sinnvoll, die Relais dürfen nicht unabhängig geschaltet werden !
@@ -573,7 +589,10 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
     <p class="haelfte">Minimal Status Blue:</p>
     <label class="haelfte"><input type="number" size=6 id="minPercentBlue"> %%</label>
 
-
+    <p class="haelfte">Überschuss 1 Panel an Bluetti:</p>
+    <label class="haelfte"><input type="number" size=6 id="seGridMinCharge"> W</label>
+    <p class="haelfte">Überschuss beide Panels an Bluetti:</p>
+    <label class="haelfte"><input type="number" size=6 id="seGridBothCharge"> W</label>
 
 		<h3>Details</h3>
 
@@ -582,10 +601,11 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
 		<button class="span3" type="button" id="bBlueDCOff"  > aus </button>
   
     <!-- Servo (testen) -->
-		<p> Servo steuern (links / rechts / stop), die Einspeisung durch Bluetti ändern oder Änderung stoppen (nur wenn Bluetti DC auch an ist)  </p>
+		<p> Servo steuern (links / rechts / stop)  </p>
 		<button type="button"  id="bServoLeft"> erhöhen</button>
 		<button type="button"  id="bServoRight"> verringern</button>
 		<button type="button"  id="bServoStop"> Stop</button>
+    <small>Einspeisung durch Bluetti ändern oder Änderung stoppen (nur wenn Bluetti DC auch an ist)</small>    
   </div>
 
     <!-- relais dürfen nicht mehr unabhängig geschaltet werden 

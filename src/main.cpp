@@ -185,12 +185,16 @@ void informClients()
   ws.textAll(json);
 
   //und statusmeldungen als confirm senden, nein als status
-  char status[384];
+  char status[512];
   int n = snprintf(status, sizeof(status),
     "{\"action\":\"status\",\"intervalAutoAdjust\":%d,"
     "\"intervalAutoCharge\":%d,\"maxPowerBlue\":%d,"
-    "\"minPercentBlue\":%d,\"values\":[", intervalAutoAdjust,intervalAutoCharge, power.maxPowerBlue,power.minPercentBlue);
-  //values kommen gleich 
+    "\"minPercentBlue\":%d,\"seGridMinCharge\":%d,"
+    "\"seGridBothCharge\":%d,\"values\":[", 
+    intervalAutoAdjust, intervalAutoCharge, 
+    power.maxPowerBlue, power.minPercentBlue,
+    power.seGridMinCharge, power.seGridBothCharge);
+  
   
   if (n < 0 || n >= (int)sizeof(status)) return; //ohne status zurück
 
@@ -558,9 +562,9 @@ void handleChargeSelect()
   // Priorität 1: Bluetti laden wenn genug energie
   if (power.bluettiPercent < 98.0 
       && power.seSoe > 98.0
-      && power.seGrid > 200.0)
+      && power.seGrid > power.seGridMinCharge)//200 im Standard
   {
-    if (power.seGrid > 400.0)
+    if (power.seGrid > power.seGridBothCharge)//400 im Standard
     {
       schalteLaden(LadeStatus::BluettiOnly);
       wsMsgSerial("AutoCharge: viel Überschuss -> beide Panels auf Bluetti");
@@ -800,6 +804,16 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         power.minPercentBlue = doc["value"];
         preferences.putInt("minPercentBlue",power.minPercentBlue);
       }
+      else if (!strcmp(doc["action"],"seGridMinCharge"))
+      {
+          power.seGridMinCharge = doc["value"];
+          preferences.putInt("seGridMin", power.seGridMinCharge);
+      }
+      else if (!strcmp(doc["action"],"seGridBothCharge"))
+      {
+          power.seGridBothCharge = doc["value"];
+          preferences.putInt("seGridBoth", power.seGridBothCharge);
+      }
       else if (!strcmp(doc["action"],"status"))
       {
 
@@ -877,6 +891,10 @@ void resetStandardSettings()
   preferences.putInt("intAutoAdjust",intervalAutoAdjust );
   intervalAutoCharge = 120;
   preferences.putInt("intAutoCharge",intervalAutoCharge );
+  power.seGridMinCharge = 200;
+  preferences.putInt("seGridMin", 200);
+  power.seGridBothCharge = 400;
+  preferences.putInt("seGridBoth", 400);
 }
 
               
@@ -952,6 +970,8 @@ void setup() {
   autoAdjustBlue = preferences.getBool("autoAdjustBlue", false);
   power.maxPowerBlue  = preferences.getInt("maxPowerBlue",100);
   power.minPercentBlue  = preferences.getInt("minPercentBlue",10);
+  power.seGridMinCharge  = preferences.getInt("seGridMin", 200);
+  power.seGridBothCharge = preferences.getInt("seGridBoth", 400);
   intervalAutoAdjust  = preferences.getInt("intAutoAdjust",120);
   intervalAutoCharge = preferences.getInt("intAutoCharge",120 );
   //informClients(); nein, in Startmeldungen, das reicht 
@@ -971,8 +991,9 @@ void loop() {
   }
   mqttClient.loop();
   blue.handleBluetooth();
+  handleChargeSelect(); //zuerst, sorgt ggf. dafür das Bluetti nicht angeschaltet wird. 
   handleAdjustBluetti();
-  handleChargeSelect();
+  
   
   long now = millis();
   long delta = now - lastMsg;
