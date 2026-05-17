@@ -48,14 +48,29 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
           position: sticky;
           top: 0em;
       }
-      #dInfo{
+      #dInfo {
         background: rgba(252, 252, 252, 0.95);
-        display: grid;
-        gap: 		0.5em  2em; /* row column */ 
-        grid-template-columns: auto auto;   
-        justify-content: start;
-        align-items: center;     
       }
+      #dInfo h2 {
+        margin-bottom: 0.5em;
+      }
+      .infoGrid {
+          display: grid;
+          grid-template-columns: auto auto;
+          gap: 1em;
+          justify-content: start;
+      }
+      .infoGrid table {
+          border-collapse: collapse;
+      }
+      .infoGrid td {
+          padding: 2px 8px 2px 0;
+      }
+      @media only screen and (max-width: 500px) {
+          .infoGrid {
+              grid-template-columns: 1fr;
+          }
+      }        
       #dInfoS{
         background: rgba(252, 252, 252, 0.95);
         display: grid;
@@ -506,25 +521,30 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         <div>P. Solar: <span id="valSolar">?</span></div>
         <button id="bHideInfoS">&oplus;</button>
       </div>
+
       <div class="framed" id="dInfo">
         <h2>Information <span id="dateTime">?</span><span><button id="bHideInfo">&otimes;</button></span></h2>
-        <!-- neue Zeile -->
-        <div>P. Haus: <span id="valPowerHouse">?</span></div>
-        <div>Deye Solar: <span id="valSolarDeyePower">?</span></div>
-        <!-- neue Zeile -->
-
-        <div>Blue State: <span id="valBluettiPercent">?</span></div>
-        <div>Blue Solar: <span id="valSolarBluePower">?</span></div>
-        <!-- neue Zeile -->
-        <div>Blue P: <span id="valBluePowerDC">? </span>/<span id="valBluePowerAC">?</span></div>
-        <div id="valBlueInvPower">?</div>
-        <!-- SolarEdge -->
-        <div>SE Netz: <span id="valSEGrid">?</span></div>
-        <div>SE AC: <span id="valSEPowerAC">?</span></div>
-        <div>SE DC (Solar): <span id="valSEPowerDC">?</span></div>
-        <div>SE Bat: <span id="valSEPowerBat">?</span></div>
-        <div>SE Ladestand: <span id="valSESoe">?</span></div>
+        <div class="infoGrid">
+          <table >
+            <tr><th colspan="2" >Bluetti</th></tr>
+            <tr><td>P. Haus</td>         <td id="valPowerHouse">?</td></tr>
+            <tr><td>Deye Solar</td>      <td id="valSolarDeyePower">?</td></tr>
+            <tr><td>Blue State</td>      <td id="valBluettiPercent">?</td></tr>
+            <tr><td>Blue Solar</td>      <td id="valSolarBluePower">?</td></tr>
+            <tr><td>Blue DC/AC</td>      <td><span id="valBluePowerDC">?</span> / <span id="valBluePowerAC">?</span></td></tr>
+            <tr><td>Blue Inverter</td>   <td id="valBlueInvPower">?</td></tr>
+          </table>
+          <table style="border-collapse:collapse">
+            <tr><th colspan="2">SolarEdge</th></tr>
+            <tr><td>Netz</td>      <td id="valSEGrid">?</td></tr>
+            <tr><td>AC</td>        <td id="valSEPowerAC">?</td></tr>
+            <tr><td>DC (Solar)</td><td id="valSEPowerDC">?</td></tr>
+            <tr><td>Batterie</td>  <td id="valSEPowerBat">?</td></tr>
+            <tr><td>Ladestand</td> <td id="valSESoe">?</td></tr>
+          </table>
+        </div>
       </div>
+
     </div>
   <div class="framed" id = "dManuell">
     <h2> manuelle Schalter und Information</h2>
