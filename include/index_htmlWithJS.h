@@ -136,8 +136,8 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       }
                
       .framed { 
-       border: 1px solid black; 
-       padding: 1em;
+        border: 1px solid black; 
+        padding: 1em;
       }
       
       #controlContainer { /* hmm ein grid ist etwas übertrieben */

@@ -500,7 +500,7 @@ void handleAdjustBluetti()
   }
 
   // Netzbezug vorhanden und unter maxPowerBlue -> erhöhen
-  if (power.seGrid < -30.0 && power.blueInverter < power.maxPowerBlue)
+  if ((power.seGrid < -50.0 || power.sePowerBat )< -50.0 && power.blueInverter < power.maxPowerBlue)
   {
     if (servoStatus != ServoStatus::Left)
     {
@@ -587,7 +587,8 @@ void handleChargeSelect()
   }
 
   // Priorität 2: Bluetti unterstützt SolarEdge
-  if (power.seGrid < -50.0 && power.bluettiPercent > 10)
+  if ((power.seGrid < -50.0 || power.sePowerBat < -50.0 )
+        && power.bluettiPercent > power.minPercentBlue)
   {
     schalteLaden(LadeStatus::DeyeOnly);
     if (!power.bluettiDCState)
@@ -595,7 +596,7 @@ void handleChargeSelect()
       blue.switchOut((char *) "dc_output_on", (char *) "on");
       blue.handleBluetooth();
     }
-    adjustBluettiFlag = true; // Servo regelt auf max 120W
+    //adjustBluettiFlag = true; // Servo regelt auf max 120W nein
     wsMsgSerial("AutoCharge: Netzbezug -> Bluetti unterstützt");
     return;
   }
