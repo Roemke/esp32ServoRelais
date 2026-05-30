@@ -21,14 +21,19 @@ class Power {
     int deyeInverter;    //aus webapi  ""
     
     //daten des Wechselrichters von solarEdge
-    float seGrid; //Netzbezug, positiv = Einspeisung, negativ = Bezug
-    float sePowerAC; // Wechselrichter-Ausgang (solar + batterie + wandlungsverluste)
-    float sePowerDC;   // Solar DC
-    float sePowerBat;  // Batterie (negativ=Entladung)
-    float seSoe;        // Ladestand %
-    float seHouse; // tatsächlicher Hausverbrauch, wird gerechnet aus sePowerAC - seGrid
-
-
+    float sePowerDC;        // Solar DC (nur Solar, ohne Batterie, vom pi gemessen, nein, das ist unklar)
+    float sePowerAC;        // AC-Ausgang Wechselrichter
+    float seSolar;      // berechneter Solar-Ertrag SolarEdge
+    float seInverterLoss;   // DC→AC Wandlerverluste
+    float seInverterLossPct; // Wandlerverluste in Prozent bezogen auf DC-Leistung
+    float seGrid;           // Netzbezug, negativ = Bezug, positiv = Einspeisung
+    float seGridExport;     // Einspeisung ins Netz
+    float seGridImport;     // Bezug aus Netz
+    float sePowerBat;       // Batterie (positiv=laden, negativ=entladen)
+    float seBatCharging;    // sePowerBat positiv, Batterie lädt
+    float seBatDischarging; // sePowerBat negativ, Batterie entlädt, hier positiv dargestellt
+    float seSoe;            // Ladestand %
+    float house;          // Hausverbrauch berechnet aus solaredge, bluetti, deye, gridbezug, einspeisung
 
     int bluettiOutDC;         //aus bluetooth ab hier
     int bluettiOutAC;
@@ -41,38 +46,27 @@ class Power {
     int seGridMinCharge;   // Mindest-Überschuss um ein Panel auf Bluetti zu schalten (200W)
     int seGridBothCharge;  // Überschuss um beide Panels auf Bluetti zu schalten (400W) 
     
-    //Mittelwerte
-    /* das ist noch nicht durchdacht, weiss nicht, ob ich das möchte  
-    int mHouse;           
-    int mBlueInverter; 
-    int mDeyeInverter;    
-    int mBluetti;         
-    int mBluettiPercent;  
-    */
 
     //Fehler 
-    //bool eHouse;
+    bool eHouse;
     bool eBlueInverter;
     bool eDeyeInverter;
     bool eBluetti;  //bluetooth
 
-    //zaehler fuer die Mittelwerte
-    /*
-    int blueCounter; 
-    int apiCounter; 
-    */
     //Methoden 
     public:
       Power()
       {
-        //eHouse =  raus
-        eBlueInverter = eDeyeInverter = eBluetti = true;
+        eHouse = eBlueInverter = eDeyeInverter = eBluetti = true;
         bluettiDCState = false; 
         //house = raus
-        blueInverter = deyeInverter = bluettiOutDC = bluettiOutAC = bluettiIn = bluettiPercent = 0;        
+        blueInverter = deyeInverter = bluettiOutDC = bluettiOutAC = bluettiIn = bluettiPercent = 0;                
         maxPowerBlue = 100;
         minPercentBlue = 20;
-        seHouse = seGrid = sePowerAC = sePowerDC = sePowerBat = seSoe = 0; 
+        house = seGridExport = seGridImport = sePowerAC = sePowerBat = seSoe = 0;
+        sePowerDC = seInverterLoss = seBatCharging = seBatDischarging = 0;
+        seSolar =  0;
+        
         http.useHTTP10(true); //use old http1.0 - stream is not chunked
         seGridMinCharge = 200;
         seGridBothCharge = 400;

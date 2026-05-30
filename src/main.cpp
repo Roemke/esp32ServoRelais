@@ -180,7 +180,7 @@ void wsMsgSerialNLB(const char *message, AsyncWebSocketClient * client = 0) //No
 //daten aus dem Power-Objekt an die Clients senden
 void informClients()
 {
-  char json[384];
+  char json[512];
   power.getJSON("power",json,sizeof(json));
   ws.textAll(json);
 
@@ -266,7 +266,7 @@ void mqttPublish()
 void sendAvailableData(AsyncWebSocketClient * client, AsyncWebSocket *server)
 {
    //sende die Daten an den Client
-   char json[384];
+   char json[512];
    wsMessage(startmeldungen.htmlLines().c_str(),client);
    String msg = String("WebSocket client ") + String(client->id()) + String(" connected from ") +  client->remoteIP().toString();
    wsMsgSerial(msg.c_str());
@@ -464,7 +464,8 @@ void handleAdjustBluetti()
 {
   char out[256];
   static bool firstCall = true;
-  
+  static unsigned long lastAction = 0;
+  static bool switchOnSent = false;
 
   if (!adjustBluettiFlag) return;
 
@@ -486,29 +487,38 @@ void handleAdjustBluetti()
   {
     adjustBluettiFlag = false;
     firstCall = true;
+    switchOnSent = false;
     return;
   }
 
   // Bluetti einschalten falls noch aus
   if (!power.bluettiDCState)
   {
-    wsMsgSerial("schalte Bluetti an");
-    blue.switchOut((char *) "dc_output_on", (char *) "on");
-    blue.handleBluetooth();
-    delay(2000);
+    unsigned long now = millis();
+    if (now - lastAction < 2000) return;
+    if (!switchOnSent) 
+    {
+      wsMsgSerial("schalte Bluetti an");
+      blue.switchOut((char *) "dc_output_on", (char *) "on");
+      blue.handleBluetooth();
+      switchOnSent = true;
+    }
+    lastAction = now;
     return;
   }
 
   // Netzbezug vorhanden und unter maxPowerBlue -> erhöhen
-  if ((power.seGrid < -50.0 || power.sePowerBat )< -50.0 && power.blueInverter < power.maxPowerBlue)
+  if ((power.seGrid < -50.0 || power.sePowerBat < -50.0) && power.blueInverter < power.maxPowerBlue)
   {
     if (servoStatus != ServoStatus::Left)
     {
       servoStatus = ServoStatus::Left;
       servo.write((int) servoStatus);
     }
-    wsMsgSerialNLB("(+)"); //zeige Erhöhung
-    delay(1000);
+    unsigned long now = millis();
+    if (now - lastAction < 1000) return;
+    lastAction = now;
+    wsMsgSerialNLB("(+)"); //zeige Erhöhung    
     return;
   }
 
@@ -525,8 +535,9 @@ void handleAdjustBluetti()
       servo.write((int) servoStatus);
       adjustBluettiFlag = false;
       firstCall = true;
+      switchOnSent = false;
       ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluettiDone\"}");
-      delay(2000);
+      lastAction = millis();
       return;
     }
     // sonst verringern
@@ -535,8 +546,10 @@ void handleAdjustBluetti()
       servoStatus = ServoStatus::Right;
       servo.write((int) servoStatus);
     }
-    wsMsgSerialNLB("(-)"); //zeige verringerung
-    delay(1000);
+    unsigned long now = millis();
+    if (now - lastAction < 1000) return;
+    lastAction = now;
+    wsMsgSerialNLB("(-)"); //zeige verringerung    
     return;
   }
 
@@ -548,7 +561,6 @@ void handleAdjustBluetti()
     wsMsgSerial("adjust Blue - Servo stop, im Lot");
     firstCall = true;
     ws.textAll("{\"action\":\"confirm\",\"topic\":\"adjustBluettiDone\"}");
-    delay(100);
   }
 }
 

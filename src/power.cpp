@@ -27,7 +27,7 @@ void Power::actualizeData()
     }
     http.end();
   */
-  //zwei mal die Standard tasmota steckdose 
+  //zwei mal die Standard tasmota steckdose , muss vor dem inverter abgefragt werden, da die Werte für den Hausverbrauch gebraucht werden
   readTasmotaSteckdose(powerBlueInverterGet,blueInverter,eBlueInverter);
   readTasmotaSteckdose(powerDeyeInverterGet,deyeInverter,eDeyeInverter);
 
@@ -44,7 +44,7 @@ void Power::readTasmotaSteckdose(const char *getString, int &power, bool &err)
   //{"StatusSNS":{"Time":"2023-10-09T09:21:49","ENERGY":{"TotalStartTime":"2023-07-10T09:17:23","Total":49.766,"Yesterday":0.608,"Today":0.011,"Power":1,"ApparentPower":20,"ReactivePower":20,"Factor":0.06,"Voltage":230,"Current":0.085}}}
   //beachte: Stream braucht mehr speicher, trotz assistant der 384 empfohlen hat, bekomme ich Nomemory - manchmal 
   //filter würde auch etwas reduzieren
-    JsonDocument doc; //groesse mit dem assistant ermittelt, doc sollte nur einmal verwendet werden 
+    JsonDocument doc; //neu Größe automatisch
     DeserializationError error = deserializeJson(doc, http.getStream());
     if (error) 
     {
@@ -64,7 +64,10 @@ void Power::readTasmotaSteckdose(const char *getString, int &power, bool &err)
 void Power::readFromInverter()
 {
   http.begin(inverterServerGet);
-  http.GET();//{"power":878.55,"power_ac":768.35,"power_bat":0.11,"power_dc":780.22,"soe":98.89}
+  http.GET();//{'time': '2026-05-28T18:33:36Z', 'power_dc': 244.1, 'power_ac': 240.4, 
+  //'inverter_losses': -48.3, 'grid': 2.3, 'grid_export': 2.3, 'grid_import': 0, 
+  //'bat_power': 52.0, 'bat_charging': 52.0, 'bat_discharging': 0, 'bat_soe': 96.7}
+
   //https://arduinojson.org/v6/assistant/#/step1 esp32 stream
   JsonDocument doc;
 
@@ -78,14 +81,36 @@ void Power::readFromInverter()
     //err = true;
   }
   else
-  {   //folgendes muessten die nötigen Daten sein        
+  {   //folgendes muessten die nötigen Daten sein, nehme nur das nötige
       //err = false;
-      seGrid    = doc["power"];      // Netzbezug, negativ = Bezug, positiv = Einspeisung
+      seGrid    = doc["grid"];      // Netzbezug, negativ = Bezug, positiv = Einspeisung    
+      seGridExport = doc["grid_export"];
+      seGridImport = doc["grid_import"];
       sePowerAC = doc["power_ac"];   // Wechselrichter-Ausgang
-      sePowerDC = doc["power_dc"];   // Solar DC
-      sePowerBat = doc["power_bat"]; // Batterie (negativ=Entladung)
-      seSoe     = doc["soe"];        // Ladestand %
-      seHouse   = sePowerAC - seGrid; // tatsächlicher Hausverbrauch
+      sePowerDC = doc["power_dc"];   // DC Solar
+      sePowerBat = doc["bat_power"]; // Batterie (negativ=Entladung)
+      seBatCharging = doc["bat_charging"]; // Batterie lädt
+      seBatDischarging = doc["bat_discharging"]; // Batterie entlädt, hier positiv dargestellt
+      seSoe     = doc["bat_soe"];        // Ladestand %
+
+      house   = sePowerAC + blueInverter + deyeInverter - seGrid; // tatsächlicher Hausverbrauch            
+      eHouse = eBlueInverter || eDeyeInverter; //fehler von solaredge nicht berücksichtigt. 
+
+      //float raw_solar = sePowerAC + seBatCharging + seGridExport - seGridImport - seBatDischarging; war wohl noch falsch
+      float raw_solar = sePowerAC + seBatCharging - seBatDischarging;
+      if (raw_solar >= 0) {
+          seSolar         = raw_solar;
+          seInverterLoss  = sePowerDC - sePowerAC;
+          seInverterLossPct = (sePowerDC > 0) ? seInverterLoss / sePowerDC * 100.0 : 0;
+      } else if (seBatDischarging > 50 && seGridImport < 5) {
+          seSolar           = 0;
+          seInverterLoss    = -raw_solar;
+          seInverterLossPct = seInverterLoss / seBatDischarging * 100.0;
+      } else {
+          seSolar           = 0;
+          seInverterLoss    = -1;
+          seInverterLossPct = -1;
+      }
   }
 }
 
@@ -94,15 +119,16 @@ void Power::readFromInverter()
 //methode sollte mit einem puffer von 384 bytes gerufen werden
 size_t Power::getJSON(const char *action, char *buf, size_t buflen)
 {
-   const char *fallback = "{\"action\":\"power\",\"error\":\"json_overflow\"}";
+  const char *fallback = "{\"action\":\"power\",\"error\":\"json_overflow\"}";
   if (!buf || buflen < strlen(fallback)+1 ) return 0; //klarer fehlaufruf
   
   JsonDocument doc;
   doc["action"] = action;
   //static char output[384]; //zu gefährlich
   
-  JsonObject values = doc["values"].to<JsonObject>(); 
-  values["powerHouse"] = seHouse;
+  JsonObject values = doc["values"].to<JsonObject>();
+  house = sePowerAC + blueInverter + deyeInverter - seGrid; // tatsächlicher Hausverbrauch, hier nochmal aktualisiert, da sich die Werte geändert haben könnten 
+  values["powerHouse"] = house;
   values["powerBlueInv"] = blueInverter;
   values["powerDeyeInv"] = deyeInverter;
   values["bluettiOutDC"] = bluettiOutDC;
@@ -118,13 +144,12 @@ size_t Power::getJSON(const char *action, char *buf, size_t buflen)
   values["sePowerDC"]  = sePowerDC;   // Solar DC
   values["sePowerBat"] = sePowerBat;  // Batterie (negativ=Entladung)
   values["seSoe"]      = seSoe;       // SolarEdge Ladestand %
-  /*
-  values["mHouse"] = mHouse;
-  values["mBlueInverter"] = mBlueInverter;
-  values["mDeyeInverter"] = mDeyeInverter;
-  values["mBluettiPercent"] = 200;
-  values["meanBluettiIn"] = 200;
-  */
+
+  values["seSolar"]           = seSolar;  
+  values["totalSolar"] = seSolar + blueInverter + deyeInverter;
+  values["seInverterLoss"]    = seInverterLoss;   
+  values["seInverterLossPct"] = seInverterLossPct;
+  
   size_t n = serializeJson(doc, buf, buflen);
   if (n == 0) { //fehler   
     // sicher kopieren
@@ -137,6 +162,6 @@ char * Power::getString()
 {
   static char out[96];
   sprintf(out, "house: %.1f, bluePerc: %d, bluettiSolarIn: %d, deyeSolar: %d, blueOut: %d",
-                 seHouse, bluettiPercent, bluettiIn, deyeInverter, blueInverter);
+                 house, bluettiPercent, bluettiIn, deyeInverter, blueInverter);
   return out;
 }

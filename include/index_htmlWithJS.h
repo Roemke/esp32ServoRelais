@@ -329,10 +329,17 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
                 let vBP = document.getElementById("valBluettiPercent");
                 let vSEGrid    = document.getElementById("valSEGrid");
                 let vSEPowerAC = document.getElementById("valSEPowerAC");
-                let vSEPowerDC = document.getElementById("valSEPowerDC");
                 let vSEPowerBat= document.getElementById("valSEPowerBat");
+                
+                let vSESolar     = document.getElementById("valSESolar");
+                let vTotalSolar  = document.getElementById("valTotalSolar");
+                                
+                let vSEInverterLoss  = document.getElementById("valSEInverterLoss");
+                let vSEInverterLossPct = document.getElementById("valSEInverterLossPct");
+                
                 let vSESoe     = document.getElementById("valSESoe");
                 let seGrid = data.values.seGrid;
+
                 vSEGrid.classList.remove("green","red");
                 let seGridString = seGrid >=0 ? seGrid.toFixed(0) + " W Einspeisung" 
                                               : (-seGrid).toFixed(0) + " W Bezug";
@@ -340,13 +347,31 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
                   vSEGrid.classList.add("green");
                 else
                   vSEGrid.classList.add("red");
-
                 vSEGrid.innerHTML    =  seGridString;
+                
+                //batterie analog
+                let bat = data.values.sePowerBat;
+                let seBatString = bat > 0 ? bat.toFixed(0) + " W lädt" 
+                                              : (bat < 0) ? (-bat).toFixed(0) + " W entlädt"
+                                              : "0 W";
+                vSEPowerBat.classList.remove("green","red");
+                if (bat > 0) 
+                    vSEPowerBat.classList.add("green");
+                else if (bat < 0)                     
+                    vSEPowerBat.classList.add("red");
+                vSEPowerBat.innerHTML = seBatString;  
+
+
                 vSEPowerAC.innerHTML = data.values.sePowerAC.toFixed(0) + " W";
-                vSEPowerDC.innerHTML = data.values.sePowerDC.toFixed(0) + " W";
-                vSEPowerBat.innerHTML= data.values.sePowerBat.toFixed(0)+ " W";
+                vSESolar.innerHTML    = data.values.seSolar.toFixed(0)    + " W";
+                vTotalSolar.innerHTML = data.values.totalSolar.toFixed(0) + " W";
+
                 vSESoe.innerHTML     = data.values.seSoe.toFixed(1)     + " %%";
-  
+                vSEInverterLoss.innerHTML    = data.values.seInverterLoss >= 0 
+                    ? data.values.seInverterLoss.toFixed(0) + " W" : "n/a";
+                vSEInverterLossPct.innerHTML = data.values.seInverterLossPct >= 0 
+                    ? data.values.seInverterLossPct.toFixed(1) + " %%" : "n/a";
+                    
                 vDateTime.innerHTML =  "(" + now.toLocaleDateString('en-CA') + 
                                        " " + now.toLocaleTimeString('de-DE') + ")";
                 
@@ -357,15 +382,13 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
                 vBIP.innerHTML = (!data.values.eBlueInverter) ? data.values.powerBlueInv.toFixed(0) + " W I." : '?';                                
                                  
                 vBSolarP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiIn.toFixed(0) + " W" : '?';
-                let solarTotal = parseFloat((!data.values.eBluetti) ? data.values.bluettiIn : 0) ;
-                solarTotal += parseFloat((!data.values.eDeyeInverter) ? data.values.powerDeyeInv : 0);
-                solarTotal += data.values.sePowerDC;
-
-                vps.innerHTML = solarTotal.toFixed(0) + " W"; 
+                
+                vps.innerHTML = data.values.totalSolar.toFixed(0) + " W";
                 vBDCP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiOutDC.toFixed(0) +" W" : '? W'; 
                 vBACP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiOutAC.toFixed(0) +" W" : '? W'; 
                 vBP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiPercent.toFixed(1) + " %%": "?" ;
-                //status anhand der Werte ablesen
+                
+
 
               break;
               case "confirm":
@@ -537,30 +560,32 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         <div>P. Solar: <span id="valSolar">?</span></div>
         <button id="bHideInfoS">&oplus;</button>
       </div>
+    </div>
 
-      <div class="framed" id="dInfo">
-        <h2>Information <span id="dateTime">?</span><span><button id="bHideInfo">&otimes;</button></span></h2>
-        <div class="infoGrid">
-          <table >
-            <tr><th colspan="2" >Bluetti</th></tr>
-            <tr><td>P. Haus</td>         <td id="valPowerHouse">?</td></tr>
-            <tr><td>Deye Solar</td>      <td id="valSolarDeyePower">?</td></tr>
-            <tr><td>Blue State</td>      <td id="valBluettiPercent">?</td></tr>
-            <tr><td>Blue Solar</td>      <td id="valSolarBluePower">?</td></tr>
-            <tr><td>Blue DC/AC</td>      <td><span id="valBluePowerDC">?</span> / <span id="valBluePowerAC">?</span></td></tr>
-            <tr><td>Blue Inverter</td>   <td id="valBlueInvPower">?</td></tr>
-          </table>
-          <table style="border-collapse:collapse">
-            <tr><th colspan="2">SolarEdge</th></tr>
-            <tr><td>Netz</td>      <td id="valSEGrid">?</td></tr>
-            <tr><td>AC</td>        <td id="valSEPowerAC">?</td></tr>
-            <tr><td>DC (Solar)</td><td id="valSEPowerDC">?</td></tr>
-            <tr><td>Batterie</td>  <td id="valSEPowerBat">?</td></tr>
-            <tr><td>Ladestand</td> <td id="valSESoe">?</td></tr>
-          </table>
-        </div>
+    <div class="framed" id="dInfo">
+      <h2>Information <span id="dateTime">?</span><span><button id="bHideInfo">&otimes;</button></span></h2>
+      <div class="infoGrid">
+        <table >
+          <tr><th colspan="2" >Bluetti</th></tr>
+          <tr><td>P. Haus</td>         <td id="valPowerHouse">?</td></tr>
+          <tr><td>Deye Solar</td>      <td id="valSolarDeyePower">?</td></tr>
+          <tr><td>Blue State</td>      <td id="valBluettiPercent">?</td></tr>
+          <tr><td>Blue Solar</td>      <td id="valSolarBluePower">?</td></tr>
+          <tr><td>Blue DC/AC</td>      <td><span id="valBluePowerDC">?</span> / <span id="valBluePowerAC">?</span></td></tr>
+          <tr><td>Blue Inverter</td>   <td id="valBlueInvPower">?</td></tr>
+        </table>
+        <table style="border-collapse:collapse">
+          <tr><th colspan="2">SolarEdge</th></tr>
+          <tr><td>Netz</td>      <td id="valSEGrid">?</td></tr>
+          <tr><td>AC</td>        <td id="valSEPowerAC">?</td></tr>
+          <tr><td>Solar ges.</td><td id="valTotalSolar">?</td></tr>
+          <tr><td>SE Solar</td>  <td id="valSESolar">?</td></tr>
+          <tr><td>Batterie</td>  <td id="valSEPowerBat">?</td></tr>
+          <tr><td>WR Verlust</td>    <td id="valSEInverterLoss">?</td></tr> 
+          <tr><td>WR Verlust</td>      <td id="valSEInverterLossPct">?</td></tr>
+          <tr><td>Ladestand</td> <td id="valSESoe">?</td></tr>
+        </table>
       </div>
-
     </div>
   <div class="framed" id = "dManuell">
     <h2> manuelle Schalter und Information</h2>
@@ -635,8 +660,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
     Beim Umschalten auf &quot;nur Haus versorgen (Deye)&quot; dauert es einige Zeit, bis der Deye-Inverter merkt, dass er von den Solarzellen versorgt wird, 
     falls vorher nur die Bluetti geladen wurde.  
     </p>
-    <p>BluettiOut anpassen ist in dieser Version noch nicht umgesetzt, da ich den Hausverbrauch aktuell nicht lesen kann. Der Inverter von 
-    Solaredge hält ihn sowieso auf Null wenn es geht. Hier wird nicht zwischen Bluetti laden, beide Laden und nur Deye versorgen 
+    <p>BluettiOut anpassen ist umgesetzt. Hier wird nicht zwischen Bluetti laden, beide Laden und nur Deye versorgen 
     umgeschaltet, das ist (zunächst?) separat gehalten. Der  Servo-Motor wird angesteuert.</p>
     <p>Die Auto-Einstellungen haben ein Intervall, in dem Sie durchgeführt werden, Voreinstellung alle 120 Sekunden. </p>
     <p>Die maximale Leistung mit der die Bluetti einspeist kann eingestellt werden, da die Verluste bei höherer Leistung mehr als proportional anwachsen </p>
