@@ -89,10 +89,12 @@ enum class LadeStatus  {DeyeOnly=0,BluettiOnly=1,BluettiDeye=2,initDeyeOnly=3,in
   
 long lastMsg = 0;
 long lastMQTTMsg = 0;
-bool adjustBluettiFlag = false;  //Leistung der Bluetti anzupassen
-bool chargeSelectFlag = false;  //Ziel der Solareinspeisung anpassen 
-bool autoAdjustBlue = false;   //Automatische Anpassung der Leistung der Bluetti
-bool autoCharge = false;      //Automatische Wahl der Solareinspeisung
+bool adjustBluettiFlag = false;  // Servo-Regelung (Leistung Bluetti) aktiv (manuell per Webinterface gesetzt)
+bool chargeSelectFlag = false;  //Panel-Schaltung neu bewerten (Deye/Bluetti laden/Einspeisen)
+bool autoAdjustBlue = false;   //Automatische Anpassung der Leistung der Bluetti, im Webinterface
+bool autoCharge = false;      //Automatische Wahl der Solareinspeisung webinterface
+bool autoBlueInverter = false; //automatisches Zuschalten des Bluetti Inverters (Webinterface)
+
 
 int intervalAutoAdjust = 120;
 int intervalAutoCharge = 120;
@@ -104,6 +106,11 @@ long lastAutoCharge = 0;
 void handleWebSocketMessage(void*, uint8_t*, size_t);
 void schalteRelais(const char*);
 void resetStandardSettings();
+
+void handleBlueInverter();
+void handleAdjustBluetti();
+void handleChargeSelect();
+
 
 AsyncWebServer server(80);
 //fuer den Websocket
@@ -224,6 +231,7 @@ void informClients()
     append("\"servoStop\","); 
 
   (autoCharge) ? append("\"autoChargeOn\",") : append("\"autoChargeOff\",");  
+  (autoBlueInverter) ? append("\"autoBlueInverterOn\",") : append("\"autoBlueInverterOff\",");
   (autoAdjustBlue) ? append("\"autoAdjustBlueOn\"") : append("\"autoAdjustBlueOff\"");  
   
   append("]}");
@@ -482,6 +490,70 @@ void schalteLaden(LadeStatus dest)
     ws.textAll(out);
   }
 }
+
+//inverter der Bluetti dazu schalten
+void handleBlueInverter()
+{
+    // nur wenn autoBlueInverter aktiv
+    if (!autoBlueInverter) return;
+
+    // Ausschalten wenn Panels Bluetti laden
+    if (ladeStatus != LadeStatus::DeyeOnly)
+    {
+        if (power.bluettiDCState)
+        {
+            blue.switchOut((char *) "dc_output_on", (char *) "off");
+            blue.handleBluetooth();
+            servoStatus = ServoStatus::Stop;
+            servo.write((int) servoStatus);
+            adjustBluettiFlag = false;
+            wsMsgSerial("BlueInverter: Panels laden Bluetti, schalte Inverter ab");
+        }
+        return;
+    }
+
+    // Ausschalten wenn Bluetti zu leer
+    if (power.bluettiPercent <= power.minPercentBlue)
+    {
+        if (power.bluettiDCState)
+        {
+            blue.switchOut((char *) "dc_output_on", (char *) "off");
+            blue.handleBluetooth();
+            servoStatus = ServoStatus::Stop;
+            servo.write((int) servoStatus);
+            adjustBluettiFlag = false;
+            wsMsgSerial("BlueInverter: Bluetti zu leer, schalte ab");
+        }
+        return;
+    }
+
+    // Einschalten wenn Bedarf
+    if ((power.seGrid < -50.0 || power.sePowerBat < -50.0)
+        && power.bluettiPercent > power.minPercentBlue)
+    {
+        if (!power.bluettiDCState)
+        {
+            blue.switchOut((char *) "dc_output_on", (char *) "on");
+            blue.handleBluetooth();
+            wsMsgSerial("BlueInverter: Bedarf erkannt, schalte Inverter ein");
+        }
+        return;
+    }
+
+    // Ausschalten wenn kein Bedarf mehr
+    if (power.seGrid > 30.0 && power.sePowerBat >= 0)
+    {
+        if (power.bluettiDCState)
+        {
+            blue.switchOut((char *) "dc_output_on", (char *) "off");
+            blue.handleBluetooth();
+            servoStatus = ServoStatus::Stop;
+            servo.write((int) servoStatus);
+            adjustBluettiFlag = false;
+            wsMsgSerial("BlueInverter: kein Bedarf mehr, schalte ab");
+        }
+    }
+}
 //Falls Zustand ok die Bluetti einschalten und Leistung anpassen.
 void handleAdjustBluetti()
 {
@@ -514,21 +586,6 @@ void handleAdjustBluetti()
     return;
   }
 
-  // Bluetti einschalten falls noch aus
-  if (!power.bluettiDCState)
-  {
-    unsigned long now = millis();
-    if (now - lastAction < 2000) return;
-    if (!switchOnSent) 
-    {
-      wsMsgSerial("schalte Bluetti an");
-      blue.switchOut((char *) "dc_output_on", (char *) "on");
-      blue.handleBluetooth();
-      switchOnSent = true;
-    }
-    lastAction = now;
-    return;
-  }
 
   // Netzbezug vorhanden und unter maxPowerBlue -> erhöhen
   if ((power.seGrid < -50.0 || power.sePowerBat < -50.0) && power.blueInverter < power.maxPowerBlue)
@@ -551,9 +608,6 @@ void handleAdjustBluetti()
     // abschalten wenn kaum noch Last
     if (power.seGrid > 30.0 && power.blueInverter < 40)
     {
-      blue.switchOut((char *) "dc_output_on", (char *) "off");
-      blue.handleBluetooth();
-      wsMsgSerial("kein Bedarf mehr, schalte Bluetti ab");
       servoStatus = ServoStatus::Stop;
       servo.write((int) servoStatus);
       adjustBluettiFlag = false;
@@ -608,16 +662,7 @@ void handleChargeSelect()
     {
       schalteLaden(LadeStatus::BluettiDeye);
       wsMsgSerial("AutoCharge: Überschuss -> ein Panel Bluetti, ein Panel Deye");
-    }
-    // Bluetti Inverter aus
-    if (power.bluettiDCState)
-    {
-      blue.switchOut((char *) "dc_output_on", (char *) "off");
-      blue.handleBluetooth();
-    }
-    servoStatus = ServoStatus::Stop; //zur Sicherheit servo stoppen.
-    servo.write((int) servoStatus);
-    adjustBluettiFlag = false;
+    }        
     return;
   }
 
@@ -626,26 +671,12 @@ void handleChargeSelect()
         && power.bluettiPercent > power.minPercentBlue)
   {
     schalteLaden(LadeStatus::DeyeOnly);
-    if (!power.bluettiDCState)
-    {
-      blue.switchOut((char *) "dc_output_on", (char *) "on");
-      blue.handleBluetooth();
-    }
-    //adjustBluettiFlag = true; // Servo regelt auf max 120W nein
     wsMsgSerial("AutoCharge: Netzbezug -> Bluetti unterstützt");
     return;
   }
 
   // Sonst: alles auf Deye, Bluetti aus
-  schalteLaden(LadeStatus::DeyeOnly);
-  if (power.bluettiDCState)
-  {
-    blue.switchOut((char *) "dc_output_on", (char *) "off");
-    blue.handleBluetooth();
-    servoStatus = ServoStatus::Stop;
-    servo.write((int) servoStatus);
-    adjustBluettiFlag = false;
-  }
+  schalteLaden(LadeStatus::DeyeOnly); 
 }
 
 //nachricht vom client, stelle auf statische größen um, um heap-Fragmentierung zu vermeiden, keine Ahnung, ob
@@ -806,6 +837,20 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         }
         preferences.putBool("autoCharge",autoCharge);         
       }
+      else if (!strcmp(doc["action"], "autoBlueInverter"))
+      {
+          if (!strcmp((const char *) doc["value"], "on"))
+          {
+              autoBlueInverter = true;
+              strcat(out, "autoBlueInverterOn");
+          }
+          else
+          {
+              autoBlueInverter = false;
+              strcat(out, "autoBlueInverterOff");
+          }
+          preferences.putBool("autoBlueInv", autoBlueInverter);
+      }
       else if (!strcmp(doc["action"], "autoAdjustBlue"))
       {
         if (!strcmp((const char * )doc["value"],"on"))
@@ -919,6 +964,8 @@ void resetStandardSettings()
   preferences.putBool("autoCharge",autoCharge);
   autoAdjustBlue = false; 
   preferences.putBool("autoAdjustBlue",autoAdjustBlue);
+  autoBlueInverter = false;
+  preferences.putBool("autoBlueInv", autoBlueInverter);
   power.maxPowerBlue = 100;
   preferences.putInt("maxPowerBlue",power.maxPowerBlue );
   power.minPercentBlue = 10;
@@ -1004,6 +1051,7 @@ void setup() {
   schalteLaden((LadeStatus) ((int)ladeStatus + 3)); //+3 für init
   autoCharge = preferences.getBool("autoCharge", false);
   autoAdjustBlue = preferences.getBool("autoAdjustBlue", false);
+  autoBlueInverter = preferences.getBool("autoBlueInv", false);
   power.maxPowerBlue  = preferences.getInt("maxPowerBlue",100);
   power.minPercentBlue  = preferences.getInt("minPercentBlue",10);
   power.seGridMinCharge  = preferences.getInt("seGridMin", 200);
@@ -1028,7 +1076,8 @@ void loop() {
   mqttClient.loop();
   blue.handleBluetooth();
   handleChargeSelect(); //zuerst, sorgt ggf. dafür das Bluetti nicht angeschaltet wird. 
-  handleAdjustBluetti();
+  handleBlueInverter(); //dann dieser
+  handleAdjustBluetti();//und zu letzt
   
   
   long now = millis();

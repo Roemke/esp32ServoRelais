@@ -118,11 +118,6 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
           #dManuell .haelfte {grid-column: auto / span 3;}
 
       }
-      #dManuell * {
-      	margin-top: 0em;
-      	margin-bottom: 0em; 
-        grid-column: auto / span 2;
-      }
       #dManuell h2, #dManuell h3 {
       	grid-column: 1 / -1; /* bis zum Ende */
       	padding-top: 1em;
@@ -133,6 +128,12 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
       } 
       #dManuell small {
         grid-column: 1 / -1;
+      }
+
+      #dManuell * {
+      	margin-top: 0em;
+      	margin-bottom: 0em; 
+        grid-column: auto / span 2;
       }
                
       .framed { 
@@ -258,7 +259,15 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
           case "autoChargeOff":
             el = document.getElementById("bAutoChargeOff");
             offList = ["bAutoChargeOn"];              												
-          break;									
+          break;				
+          case "autoBlueInverterOn":
+              el = document.getElementById("bAutoBlueInverterOn");
+              offList = ["bAutoBlueInverterOff"];
+          break;
+          case "autoBlueInverterOff":
+              el = document.getElementById("bAutoBlueInverterOff");
+              offList = ["bAutoBlueInverterOn"];
+          break;					
           case "autoAdjustBlueOff":
             el = document.getElementById("bAutoAdjustBlueOff");
             offList = ["bAutoAdjustBlueOn"];              												
@@ -447,7 +456,16 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
         document.getElementById('bBlueDCOff').addEventListener("click",(e) => 
         {
             websocket.send(JSON.stringify({'action':'dc_output','value':'off'}));
-				});        
+				}); 
+        //automatisches einspeisen bluetti an/aus
+        document.getElementById('bAutoBlueInverterOn').addEventListener("click",() => 
+        { 
+            websocket.send(JSON.stringify({'action':'autoBlueInverter','value':'on'}));
+        });
+        document.getElementById('bAutoBlueInverterOff').addEventListener("click",() => 
+        { 
+            websocket.send(JSON.stringify({'action':'autoBlueInverter','value':'off'}));
+        });       
 				//anpassen der Leistung von Bluetti ins Hausnetz
         document.getElementById('bAdjustBluetti').addEventListener("click",() => 
         { 
@@ -590,19 +608,23 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
   <div class="framed" id = "dManuell">
     <h2> manuelle Schalter und Information</h2>
 
-    <p>Art der Solar-Einspeisung </p>
+    <p>Art der Solar-Einspeisung (einmalig) </p>
     <button id="bBluettiOnly"  type="button" >nur Bluetti</button>
     <button id="bDeyeOnly"     type="button" >nur Haus/Deye</button>
     <button id="bBluettiDeye"  type="button" >beide </button>
-
-    <p>Leistung Bluetti / Hausverbrauch: </p>
-    <button class="span3" id="bAdjustBluetti"  type="button">BluettiOut anpassen</button>
-    <button class="span3" id="bAdjustBluettiStop"  type="button">Anpassung abbrechen</button>
 
   	<p>Automatische Wahl der Solar-Einspeisung</p>
 		<button type="button" id="bAutoChargeOn"  >an </button>
 		<button type="button" id="bAutoChargeOff"  >aus </button>
     <label>I: <input type="number" size=6 id="intervalAutoCharge" >s</label>
+
+    <p>Automatisches Ein/Ausschalten Bluetti Inverter</p>
+    <button class="span3"type="button" id="bAutoBlueInverterOn">an</button>
+    <button class="span3" type="button" id="bAutoBlueInverterOff">aus</button>
+
+    <p>Leistung Bluetti / Hausverbrauch (einmalig): </p>
+    <button class="span3" id="bAdjustBluetti"  type="button">BluettiOut anpassen</button>
+    <button class="span3" id="bAdjustBluettiStop"  type="button">Anpassung abbrechen</button>
 
   	<p>Automatisches Anpassen der Leistung der Bluetti </p>
 		<button type="button" id="bAutoAdjustBlueOn"  >an </button>
