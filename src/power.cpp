@@ -1,38 +1,41 @@
 #include "power.h"    
 
-/*void Power::beginModBus()
+
+/* berechne abgeleitete Werte aus den vorhandenen Daten */
+void Power::calculate()
 {
-  mb.begin();
-} */
+    house      = sePowerAC + blueInverter + deyeInverter - seGrid;
+    eHouse     = eBlueInverter || eDeyeInverter;
+    
+    float raw_solar = sePowerAC + seBatCharging - seBatDischarging;
+    if (raw_solar >= 0) {
+        seSolar           = raw_solar;
+        seInverterLoss    = sePowerDC - sePowerAC;
+        seInverterLossPct = (sePowerDC > 0) ? seInverterLoss / sePowerDC * 100.0 : 0;
+    } else if (seBatDischarging > 50 && seGridImport < 5) {
+        seSolar           = 0;
+        seInverterLoss    = -raw_solar;
+        seInverterLossPct = seInverterLoss / seBatDischarging * 100.0;
+    } else {
+        seSolar           = 0;
+        seInverterLoss    = -1;
+        seInverterLossPct = -1;
+    }
+
+    totalSolar = seSolar + deyeInverter;
+    if (!eBluetti)
+        totalSolar += bluettiIn;
+}
+
 void Power::actualizeData()
 {
-  /*
-    http.begin(powerHouseGet);
-    http.GET();
-    //{"StatusSNS":{"Time":"2023-10-10T11:49:16","Power":{"Power_curr":-6,"Total_in":3670.2250,"Total_out":85.5679,"Meter_Number":"0a014954520003504c4c"}}}
-    //man koennte noch filtern
-    StaticJsonDocument<256> doc; //groesse mit dem assistant ermittelt, doc sollte nur einmal verwendet werden 
-    DeserializationError error = deserializeJson(doc, http.getStream());
-    if (error) 
-    {
-        Serial.printf("deserializeJson() of %s failed: ",powerHouseGet);
-        Serial.println(error.c_str());
-        eHouse = true; 
-    }
-    else
-    {
-      eHouse = false;
-      JsonObject PO = doc["StatusSNS"]["SML"]; //aenderung auf SML (von Power), da Script auf dem ESP an Power geändert
-      house = PO["Power_curr"]; // 134 
-    }
-    http.end();
-  */
   //zwei mal die Standard tasmota steckdose , muss vor dem inverter abgefragt werden, da die Werte für den Hausverbrauch gebraucht werden
   readTasmotaSteckdose(powerBlueInverterGet,blueInverter,eBlueInverter);
   readTasmotaSteckdose(powerDeyeInverterGet,deyeInverter,eDeyeInverter);
 
   //daten per http-abfrage über pi vom Inverter holen
   readFromInverter();
+  calculate(); //abgeleitete Werte berechnen
 }    
 
 
@@ -61,6 +64,7 @@ void Power::readTasmotaSteckdose(const char *getString, int &power, bool &err)
     http.end();
   
 }
+
 void Power::readFromInverter()
 {
   http.begin(inverterServerGet);
@@ -92,42 +96,20 @@ void Power::readFromInverter()
       seBatCharging = doc["bat_charging"]; // Batterie lädt
       seBatDischarging = doc["bat_discharging"]; // Batterie entlädt, hier positiv dargestellt
       seSoe     = doc["bat_soe"];        // Ladestand %
-
-      house   = sePowerAC + blueInverter + deyeInverter - seGrid; // tatsächlicher Hausverbrauch            
-      eHouse = eBlueInverter || eDeyeInverter; //fehler von solaredge nicht berücksichtigt. 
-
-      //float raw_solar = sePowerAC + seBatCharging + seGridExport - seGridImport - seBatDischarging; war wohl noch falsch
-      float raw_solar = sePowerAC + seBatCharging - seBatDischarging;
-      if (raw_solar >= 0) {
-          seSolar         = raw_solar;
-          seInverterLoss  = sePowerDC - sePowerAC;
-          seInverterLossPct = (sePowerDC > 0) ? seInverterLoss / sePowerDC * 100.0 : 0;
-      } else if (seBatDischarging > 50 && seGridImport < 5) {
-          seSolar           = 0;
-          seInverterLoss    = -raw_solar;
-          seInverterLossPct = seInverterLoss / seBatDischarging * 100.0;
-      } else {
-          seSolar           = 0;
-          seInverterLoss    = -1;
-          seInverterLossPct = -1;
-      }
   }
 }
 
-//meine erste variante arbeitete mit einem static char, das geht, kann aber gerade bei esp32 daneben gehen - mehrere Threads
-//char * Power::getJSON(const char * action)
-//methode sollte mit einem puffer von 384 bytes gerufen werden
-size_t Power::getJSON(const char *action, char *buf, size_t buflen)
-{
-  const char *fallback = "{\"action\":\"power\",\"error\":\"json_overflow\"}";
+//methode sollte mit einem puffer von 512 bytes gerufen werden
+size_t Power::getJSON(char *buf, size_t buflen)
+{  
+  const char *fallback = "{\"error\":\"json_overflow\"}";
   if (!buf || buflen < strlen(fallback)+1 ) return 0; //klarer fehlaufruf
   
-  JsonDocument doc;
-  doc["action"] = action;
-  //static char output[384]; //zu gefährlich
+  calculate(); //sicherstellen, dass die Werte aktuell sind
   
+  JsonDocument doc;
+  doc["action"] = "power"; //hier fest
   JsonObject values = doc["values"].to<JsonObject>();
-  house = sePowerAC + blueInverter + deyeInverter - seGrid; // tatsächlicher Hausverbrauch, hier nochmal aktualisiert, da sich die Werte geändert haben könnten 
   values["powerHouse"] = house;
   values["powerBlueInv"] = blueInverter;
   values["powerDeyeInv"] = deyeInverter;
@@ -141,12 +123,13 @@ size_t Power::getJSON(const char *action, char *buf, size_t buflen)
   values["eDeyeInverter"] = eDeyeInverter;    
   values["seGrid"]     = seGrid;      // Netzbezug
   values["sePowerAC"]  = sePowerAC;   // Wechselrichter-Ausgang
-  values["sePowerDC"]  = sePowerDC;   // Solar DC
+  values["sePowerDC"]  = sePowerDC;   // Solar DC, nein, ist unklar
   values["sePowerBat"] = sePowerBat;  // Batterie (negativ=Entladung)
   values["seSoe"]      = seSoe;       // SolarEdge Ladestand %
 
   values["seSolar"]           = seSolar;  
-  values["totalSolar"] = seSolar + blueInverter + deyeInverter;
+  values["totalSolar"] = totalSolar;
+   
   values["seInverterLoss"]    = seInverterLoss;   
   values["seInverterLossPct"] = seInverterLossPct;
   

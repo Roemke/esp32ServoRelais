@@ -181,7 +181,7 @@ void wsMsgSerialNLB(const char *message, AsyncWebSocketClient * client = 0) //No
 void informClients()
 {
   char json[512];
-  power.getJSON("power",json,sizeof(json));
+  power.getJSON(json,sizeof(json));
   ws.textAll(json);
 
   //und statusmeldungen als confirm senden, nein als status
@@ -272,7 +272,7 @@ void sendAvailableData(AsyncWebSocketClient * client, AsyncWebSocket *server)
    wsMsgSerial(msg.c_str());
    msg = String("Anzahl Clients: ") + server->count();
    wsMsgSerial(msg.c_str());
-   power.getJSON("power",json,sizeof(json));
+   power.getJSON(json,sizeof(json));
    ws.textAll(json);
    informClients();
 }

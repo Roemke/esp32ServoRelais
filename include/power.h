@@ -24,6 +24,7 @@ class Power {
     float sePowerDC;        // Solar DC (nur Solar, ohne Batterie, vom pi gemessen, nein, das ist unklar)
     float sePowerAC;        // AC-Ausgang Wechselrichter
     float seSolar;      // berechneter Solar-Ertrag SolarEdge
+    float totalSolar;   // Solar-Ertrag gesamt, also SolarEdge + Deye + Bluetti in
     float seInverterLoss;   // DC→AC Wandlerverluste
     float seInverterLossPct; // Wandlerverluste in Prozent bezogen auf DC-Leistung
     float seGrid;           // Netzbezug, negativ = Bezug, positiv = Einspeisung
@@ -65,17 +66,18 @@ class Power {
         minPercentBlue = 20;
         house = seGridExport = seGridImport = sePowerAC = sePowerBat = seSoe = 0;
         sePowerDC = seInverterLoss = seBatCharging = seBatDischarging = 0;
-        seSolar =  0;
+        seSolar = totalSolar = 0;
         
         http.useHTTP10(true); //use old http1.0 - stream is not chunked
         seGridMinCharge = 200;
         seGridBothCharge = 400;
       }
       void actualizeData();
+      void calculate(); //abgeleitete Werte berechnen
       //void beginModBus();
 
       //char *getJSON(const char *action);
-      size_t getJSON(const char *action, char *buf, size_t buflen);
+      size_t getJSON(char *buf, size_t buflen);
       char *getString();
 
     private:
