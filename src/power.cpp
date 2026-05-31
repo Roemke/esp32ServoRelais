@@ -23,8 +23,10 @@ void Power::calculate()
     }
 
     totalSolar = seSolar + deyeInverter;
-    if (!eBluetti)
+    if (!eBluetti){
         totalSolar += bluettiIn;
+        ladeLeistungBluetti = bluettiIn-bluettiOutDC;
+    }
 }
 
 void Power::actualizeData()

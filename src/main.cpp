@@ -243,13 +243,14 @@ void mqttPublish()
     sprintf(val, "%.1f", power.seGrid);
     mqttClient.publish("esp32solar/seGrid", val);
 
-    sprintf(val, "%d", power.bluettiIn);
-    mqttClient.publish("esp32solar/powerInBluetti", val);
+    sprintf(val, "%d", power.blueInverter);
+    mqttClient.publish("esp32solar/powerBluettiOutInverter", val);
 
-    sprintf(val, "%.1f", power.seBatCharging);
-    mqttClient.publish("esp32solar/powerInSolarEdge", val);
+    sprintf(val, "%.1f", power.seBatDischarging);
+    mqttClient.publish("esp32solar/powerSolarEdgeDischarge", val);
 
     // Akkus
+
     sprintf(val, "%d", power.bluettiPercent);
     mqttClient.publish("esp32solar/soeBluetti", val);
 
@@ -259,9 +260,9 @@ void mqttPublish()
     sprintf(val, "%.1f", power.sePowerBat);
     mqttClient.publish("esp32solar/ladeLeistungSolarEdge", val);
 
-    sprintf(val, "%d", power.bluettiIn);
+    sprintf(val, "%d", power.ladeLeistungBluetti);
     mqttClient.publish("esp32solar/ladeLeistungBluetti", val);
-
+    
     // Panels
     sprintf(val, "%d", power.deyeInverter);
     mqttClient.publish("esp32solar/solarDeye", val);

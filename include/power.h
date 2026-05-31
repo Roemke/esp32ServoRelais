@@ -39,6 +39,7 @@ class Power {
     int bluettiOutDC;         //aus bluetooth ab hier
     int bluettiOutAC;
     int bluettiIn;
+    int ladeLeistungBluetti; //aus laden und entladen berechnet, positiv = laden, negativ = entladen
     int bluettiPercent; 
     int maxPowerBlue;
     int minPercentBlue;
@@ -61,7 +62,8 @@ class Power {
         eHouse = eBlueInverter = eDeyeInverter = eBluetti = true;
         bluettiDCState = false; 
         //house = raus
-        blueInverter = deyeInverter = bluettiOutDC = bluettiOutAC = bluettiIn = bluettiPercent = 0;                
+        blueInverter = deyeInverter = bluettiOutDC = bluettiOutAC = bluettiIn 
+                  = bluettiPercent = ladeLeistungBluetti = 0;                
         maxPowerBlue = 100;
         minPercentBlue = 20;
         house = seGridExport = seGridImport = sePowerAC = sePowerBat = seSoe = 0;
