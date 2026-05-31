@@ -238,51 +238,51 @@ void mqttPublish()
     // Power
     power.calculate(); //sicherstellen, dass die Werte aktuell sind
     sprintf(val, "%.1f", power.house);
-    mqttClient.publish("esp32solar/powerHouse", val);
+    mqttClient.publish("esp32solar/power/powerHouse", val);
 
     sprintf(val, "%.1f", power.seGrid);
-    mqttClient.publish("esp32solar/seGrid", val);
+    mqttClient.publish("esp32solar/power/seGrid", val);
 
     sprintf(val, "%d", power.blueInverter);
-    mqttClient.publish("esp32solar/powerBluettiOutInverter", val);
+    mqttClient.publish("esp32solar/power/BluettiOutInverter", val);
 
     sprintf(val, "%.1f", power.seBatDischarging);
-    mqttClient.publish("esp32solar/powerSolarEdgeDischarge", val);
+    mqttClient.publish("esp32solar/power/SolarEdgeDischarge", val);
 
     // Akkus
 
     sprintf(val, "%d", power.bluettiPercent);
-    mqttClient.publish("esp32solar/soeBluetti", val);
+    mqttClient.publish("esp32solar/akkus/BluettiSoe", val);
 
     sprintf(val, "%.1f", power.seSoe);
-    mqttClient.publish("esp32solar/soeSolarEdge", val);
+    mqttClient.publish("esp32solar/akkus/SolarEdgeSoe", val);
 
     sprintf(val, "%.1f", power.sePowerBat);
-    mqttClient.publish("esp32solar/ladeLeistungSolarEdge", val);
+    mqttClient.publish("esp32solar/akkus/ladeLeistungSolarEdge", val);
 
     sprintf(val, "%d", power.ladeLeistungBluetti);
-    mqttClient.publish("esp32solar/ladeLeistungBluetti", val);
+    mqttClient.publish("esp32solar/akkus/ladeLeistungBluetti", val);
     
     // Panels
     sprintf(val, "%d", power.deyeInverter);
-    mqttClient.publish("esp32solar/solarDeye", val);
+    mqttClient.publish("esp32solar/panels/solarDeye", val);
 
     sprintf(val, "%d", power.bluettiIn);
-    mqttClient.publish("esp32solar/solarBluetti", val);
+    mqttClient.publish("esp32solar/panels/solarBluetti", val);
 
     sprintf(val, "%.1f", power.seSolar);
-    mqttClient.publish("esp32solar/solarEdge", val);
+    mqttClient.publish("esp32solar/panels/solarEdge", val);
 
     sprintf(val, "%.1f", power.totalSolar);
-    mqttClient.publish("esp32solar/solarTotal", val);
+    mqttClient.publish("esp32solar/panels/solarTotal", val);
 
     // Schaltung
     if (ladeStatus == LadeStatus::BluettiOnly)
-        mqttClient.publish("esp32solar/ladeStatus", "BluettiOnly");
+        mqttClient.publish("esp32solar/panels/ladeStatus", "BluettiOnly");
     else if (ladeStatus == LadeStatus::BluettiDeye)
-        mqttClient.publish("esp32solar/ladeStatus", "BluettiDeye");
+        mqttClient.publish("esp32solar/panels/ladeStatus", "BluettiDeye");
     else
-        mqttClient.publish("esp32solar/ladeStatus", "DeyeOnly");
+        mqttClient.publish("esp32solar/panels/ladeStatus", "DeyeOnly");
 }
 
 //alle daten, die am Anfang gesendet werden
