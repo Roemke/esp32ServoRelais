@@ -118,6 +118,7 @@ size_t Power::getJSON(char *buf, size_t buflen)
   values["bluettiOutDC"] = bluettiOutDC;
   values["bluettiOutAC"] = bluettiOutAC;
   values["bluettiIn"] = bluettiIn;
+  values["bluettiACIn"] = bluettiACIn;
   values["bluettiPercent"] = bluettiPercent;
   values["bluettiDCState"] = bluettiDCState ? "on" : "off";
   values["eBluetti"] = eBluetti;

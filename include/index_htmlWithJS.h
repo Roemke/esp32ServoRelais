@@ -333,6 +333,8 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
                 let vBIP = document.getElementById("valBlueInvPower");
 
                 let vBSolarP = document.getElementById("valSolarBluePower"); 
+                let vBACIn = document.getElementById("valBlueACIn");
+
                 let vBDCP = document.getElementById("valBluePowerDC");
                 let vBACP = document.getElementById("valBluePowerAC");
                 let vBP = document.getElementById("valBluettiPercent");
@@ -391,7 +393,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
                 vBIP.innerHTML = (!data.values.eBlueInverter) ? data.values.powerBlueInv.toFixed(0) + " W I." : '?';                                
                                  
                 vBSolarP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiIn.toFixed(0) + " W" : '?';
-                
+                vBACIn.innerHTML = (!data.values.eBluetti) ? data.values.bluettiACIn.toFixed(0) + " W" : '?';               
                 vps.innerHTML = data.values.totalSolar.toFixed(0) + " W";
                 vBDCP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiOutDC.toFixed(0) +" W" : '? W'; 
                 vBACP.innerHTML = (!data.values.eBluetti) ? data.values.bluettiOutAC.toFixed(0) +" W" : '? W'; 
@@ -588,8 +590,8 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
           <tr><td>P. Haus</td>         <td id="valPowerHouse">?</td></tr>
           <tr><td>Deye Solar</td>      <td id="valSolarDeyePower">?</td></tr>
           <tr><td>Blue State</td>      <td id="valBluettiPercent">?</td></tr>
-          <tr><td>Blue Solar</td>      <td id="valSolarBluePower">?</td></tr>
-          <tr><td>Blue DC/AC</td>      <td><span id="valBluePowerDC">?</span> / <span id="valBluePowerAC">?</span></td></tr>
+          <tr><td>BlueIn Solar/AC</td>      <td><span id="valSolarBluePower">?</span> / <span id="valBlueACIn">?</span></td></tr>
+          <tr><td>BlueOut DC/AC</td>      <td><span id="valBluePowerDC">?</span> / <span id="valBluePowerAC">?</span></td></tr>
           <tr><td>Blue Inverter</td>   <td id="valBlueInvPower">?</td></tr>
         </table>
         <table style="border-collapse:collapse">
@@ -618,9 +620,19 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
 		<button type="button" id="bAutoChargeOff"  >aus </button>
     <label>I: <input type="number" size=6 id="intervalAutoCharge" >s</label>
 
-    <p>Automatisches Ein/Ausschalten Bluetti Inverter</p>
+    <p>Bluetti DC Einspeisung</p>
+		<button class="span3" type="button" id="bBlueDCOn"  >an </button>
+		<button class="span3" type="button" id="bBlueDCOff"  > aus </button>
+
+    <p>Automatisches Ein/Ausschalten Bluetti Einspeisen</p>
     <button class="span3"type="button" id="bAutoBlueInverterOn">an</button>
     <button class="span3" type="button" id="bAutoBlueInverterOff">aus</button>
+
+		<p> Servo/Leistung steuern (links / rechts / stop)  </p>
+		<button type="button"  id="bServoLeft"> erhöhen</button>
+		<button type="button"  id="bServoRight"> verringern</button>
+		<button type="button"  id="bServoStop"> Stop</button>
+    <small>Einspeisung durch Bluetti ändern oder Änderung stoppen (nur wenn Bluetti DC auch an ist)</small>    
 
     <p>Leistung Bluetti / Hausverbrauch (einmalig): </p>
     <button class="span3" id="bAdjustBluetti"  type="button">BluettiOut anpassen</button>
@@ -630,7 +642,8 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
 		<button type="button" id="bAutoAdjustBlueOn"  >an </button>
 		<button type="button" id="bAutoAdjustBlueOff"  >aus </button>
     <label>I: <input type="number" size=6 id="intervalAutoAdjust">s</label>
-
+		
+    <h3>Details</h3>
     <p class="haelfte">Maximale Einspeisung Blue:</p>
     <label class="haelfte"><input type="number" size=6 id="maxPowerBlue"> W</label>
     <p class="haelfte">Minimal Status Blue:</p>
@@ -640,19 +653,7 @@ const char index_html[] PROGMEM = R"rawliteral(<!doctype html>
     <label class="haelfte"><input type="number" size=6 id="seGridMinCharge"> W</label>
     <p class="haelfte">Überschuss beide Panels an Bluetti:</p>
     <label class="haelfte"><input type="number" size=6 id="seGridBothCharge"> W</label>
-
-		<h3>Details</h3>
-
-		<p>Bluetti DC Einspeisung</p>
-		<button class="span3" type="button" id="bBlueDCOn"  >an </button>
-		<button class="span3" type="button" id="bBlueDCOff"  > aus </button>
   
-    <!-- Servo (testen) -->
-		<p> Servo steuern (links / rechts / stop)  </p>
-		<button type="button"  id="bServoLeft"> erhöhen</button>
-		<button type="button"  id="bServoRight"> verringern</button>
-		<button type="button"  id="bServoStop"> Stop</button>
-    <small>Einspeisung durch Bluetti ändern oder Änderung stoppen (nur wenn Bluetti DC auch an ist)</small>    
   </div>
 
     <!-- relais dürfen nicht mehr unabhängig geschaltet werden 

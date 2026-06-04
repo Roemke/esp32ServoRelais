@@ -352,6 +352,11 @@ void bleNotifyCallback(const char * topic , String value)
     power.bluettiOutAC = value.toInt();
     power.eBluetti = false;
   }
+  else if (!strcmp(topic, "ac_input_power"))
+  { //falls bluetti über ac geladen wird
+    power.bluettiACIn = value.toInt();
+    power.eBluetti = false;
+  }
   
   #ifdef DEBUG
   sprintf(out,"Power: State: %d Percent %d out DC %d out AC %d in %d",power.bluettiDCState, power.bluettiPercent,power.bluettiOutDC,power.bluettiOutAC, power.bluettiIn);
